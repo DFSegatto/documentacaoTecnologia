@@ -1,19 +1,15 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
+import type { User } from '@supabase/supabase-js'
 import { supabase, type Registro, type ArquivoUpload } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import FormRegistro from '../components/FormRegistro'
 
-export default function EditarRegistro() {
+export default function EditarRegistro({ user }: { user: User | null }) {
   const { id } = useParams<{ id: string }>()
-  const [registro,  setRegistro]  = useState<Registro | null>(null)
-  const [anexos,    setAnexos]    = useState<ArquivoUpload[]>([])
-  const [userEmail, setUserEmail] = useState('')
-  const [loading,   setLoading]   = useState(true)
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserEmail(data.user?.email ?? ''))
-  }, [])
+  const [registro, setRegistro] = useState<Registro | null>(null)
+  const [anexos,   setAnexos]   = useState<ArquivoUpload[]>([])
+  const [loading,  setLoading]  = useState(true)
 
   useEffect(() => {
     if (!id) return
@@ -29,7 +25,7 @@ export default function EditarRegistro() {
 
   if (loading) return (
     <div className="min-h-screen bg-[#f8f7f4]">
-      <Navbar userEmail={userEmail} />
+      <Navbar userEmail={user?.email} />
       <div className="flex items-center justify-center py-32">
         <div className="w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
       </div>
@@ -38,7 +34,7 @@ export default function EditarRegistro() {
 
   if (!registro) return (
     <div className="min-h-screen bg-[#f8f7f4]">
-      <Navbar userEmail={userEmail} />
+      <Navbar userEmail={user?.email} />
       <div className="text-center py-32">
         <p className="font-medium text-gray-700">Registro não encontrado</p>
         <Link to="/" className="text-sm text-brand-600 hover:underline mt-2 inline-block">Voltar</Link>
@@ -48,7 +44,7 @@ export default function EditarRegistro() {
 
   return (
     <div className="min-h-screen bg-[#f8f7f4]">
-      <Navbar userEmail={userEmail} />
+      <Navbar userEmail={user?.email} />
       <main className="max-w-3xl mx-auto px-4 py-8">
         <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
           <Link to="/" className="hover:text-gray-600 transition">Registros</Link>

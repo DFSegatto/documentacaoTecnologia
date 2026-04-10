@@ -3,49 +3,68 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import type { User } from '@supabase/supabase-js'
 
-import Login       from './pages/Login'
-import Home        from './pages/Home'
-import NovoRegistro from './pages/NovoRegistro'
-import VerRegistro  from './pages/VerRegistro'
+import Login         from './pages/Login'
+import Home          from './pages/Home'
+import NovoRegistro  from './pages/NovoRegistro'
+import VerRegistro   from './pages/VerRegistro'
 import EditarRegistro from './pages/EditarRegistro'
 
-function RotaProtegida({ user, children }: { user: User | null; children: React.ReactNode }) {
-  if (user === undefined) return (
+type AuthState = 'loading' | 'authenticated' | 'unauthenticated'
+
+function Spinner() {
+  return (
     <div className="min-h-screen bg-[#f8f7f4] flex items-center justify-center">
       <div className="w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
     </div>
   )
-  if (!user) return <Navigate to="/login" replace />
+}
+
+function RotaProtegida({ estado, children }: { estado: AuthState; children: React.ReactNode }) {
+  if (estado === 'loading')          return <Spinner />
+  if (estado === 'unauthenticated')  return <Navigate to="/login" replace />
   return <>{children}</>
 }
 
 export default function App() {
-  const [user, setUser] = useState<User | null | undefined>(undefined)
+  const [user,   setUser]   = useState<User | null>(null)
+  const [estado, setEstado] = useState<AuthState>('loading')
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUser(data.user))
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null)
+    supabase.auth.getUser().then(({ data }) => {
+      setUser(data.user ?? null)
+      setEstado(data.user ? 'authenticated' : 'unauthenticated')
     })
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      const u = session?.user ?? null
+      setUser(u)
+      setEstado(u ? 'authenticated' : 'unauthenticated')
+    })
+
     return () => subscription.unsubscribe()
   }, [])
 
   return (
     <Routes>
       <Route path="/login" element={
-        user ? <Navigate to="/" replace /> : <Login />
+        estado === 'loading'
+          ? <Spinner />
+          : estado === 'authenticated'
+            ? <Navigate to="/" replace />
+            : <Login />
       } />
+
       <Route path="/" element={
-        <RotaProtegida user={user}><Home /></RotaProtegida>
+        <RotaProtegida estado={estado}><Home user={user} /></RotaProtegida>
       } />
       <Route path="/registros/novo" element={
-        <RotaProtegida user={user}><NovoRegistro /></RotaProtegida>
+        <RotaProtegida estado={estado}><NovoRegistro user={user} /></RotaProtegida>
       } />
       <Route path="/registros/:id" element={
-        <RotaProtegida user={user}><VerRegistro /></RotaProtegida>
+        <RotaProtegida estado={estado}><VerRegistro user={user} /></RotaProtegida>
       } />
       <Route path="/registros/:id/editar" element={
-        <RotaProtegida user={user}><EditarRegistro /></RotaProtegida>
+        <RotaProtegida estado={estado}><EditarRegistro user={user} /></RotaProtegida>
       } />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

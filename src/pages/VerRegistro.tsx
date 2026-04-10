@@ -1,23 +1,19 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
+import type { User } from '@supabase/supabase-js'
 import { supabase, type Registro, type Anexo, type Categoria } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import CategoriaBadge from '../components/CategoriaBadge'
 
-export default function VerRegistro() {
+export default function VerRegistro({ user }: { user: User | null }) {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
   const [registro,    setRegistro]    = useState<Registro | null>(null)
   const [anexos,      setAnexos]      = useState<Anexo[]>([])
-  const [userEmail,   setUserEmail]   = useState('')
   const [loading,     setLoading]     = useState(true)
   const [confirmando, setConfirmando] = useState(false)
   const [excluindo,   setExcluindo]   = useState(false)
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserEmail(data.user?.email ?? ''))
-  }, [])
 
   useEffect(() => {
     if (!id) return
@@ -46,7 +42,7 @@ export default function VerRegistro() {
 
   if (loading) return (
     <div className="min-h-screen bg-[#f8f7f4]">
-      <Navbar userEmail={userEmail} />
+      <Navbar userEmail={user?.email} />
       <div className="flex items-center justify-center py-32">
         <div className="w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
       </div>
@@ -55,7 +51,7 @@ export default function VerRegistro() {
 
   if (!registro) return (
     <div className="min-h-screen bg-[#f8f7f4]">
-      <Navbar userEmail={userEmail} />
+      <Navbar userEmail={user?.email} />
       <div className="text-center py-32">
         <div className="text-4xl mb-3">🔍</div>
         <p className="font-medium text-gray-700">Registro não encontrado</p>
@@ -69,8 +65,7 @@ export default function VerRegistro() {
 
   return (
     <div className="min-h-screen bg-[#f8f7f4]">
-      <Navbar userEmail={userEmail} />
-
+      <Navbar userEmail={user?.email} />
       <main className="max-w-3xl mx-auto px-4 py-8">
         <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
           <Link to="/" className="hover:text-gray-600 transition">Registros</Link>
@@ -91,7 +86,6 @@ export default function VerRegistro() {
                   </svg>
                   Editar
                 </Link>
-
                 {confirmando ? (
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-500">Confirmar?</span>
@@ -116,7 +110,6 @@ export default function VerRegistro() {
                 )}
               </div>
             </div>
-
             <h1 className="text-2xl font-semibold text-gray-900 tracking-tight mb-2">{registro.titulo}</h1>
             <p className="text-sm text-gray-400">
               Criado em {formatarData(registro.criado_em)}
@@ -127,7 +120,6 @@ export default function VerRegistro() {
           </div>
 
           <div className="h-px bg-gray-100 mb-6" />
-
           <div className="tiptap-editor" dangerouslySetInnerHTML={{ __html: registro.conteudo }} />
 
           {imagens.length > 0 && (

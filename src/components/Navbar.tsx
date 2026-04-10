@@ -2,7 +2,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
 interface NavbarProps {
-  userEmail?: string
+  userEmail?: string | null
 }
 
 export default function Navbar({ userEmail }: NavbarProps) {
@@ -36,7 +36,6 @@ export default function Navbar({ userEmail }: NavbarProps) {
             </svg>
             Novo registro
           </Link>
-
           <div className="flex items-center gap-2 pl-3 border-l border-gray-100">
             {userEmail && <span className="text-xs text-gray-500 hidden sm:block">{userEmail}</span>}
             <button onClick={handleLogout} title="Sair"

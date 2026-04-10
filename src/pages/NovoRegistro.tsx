@@ -1,19 +1,12 @@
-import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import type { User } from '@supabase/supabase-js'
 import Navbar from '../components/Navbar'
 import FormRegistro from '../components/FormRegistro'
 
-export default function NovoRegistro() {
-  const [userEmail, setUserEmail] = useState('')
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserEmail(data.user?.email ?? ''))
-  }, [])
-
+export default function NovoRegistro({ user }: { user: User | null }) {
   return (
     <div className="min-h-screen bg-[#f8f7f4]">
-      <Navbar userEmail={userEmail} />
+      <Navbar userEmail={user?.email} />
       <main className="max-w-3xl mx-auto px-4 py-8">
         <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
           <Link to="/" className="hover:text-gray-600 transition">Registros</Link>

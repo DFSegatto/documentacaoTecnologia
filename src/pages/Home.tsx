@@ -1,22 +1,18 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
+import type { User } from '@supabase/supabase-js'
 import { supabase, CATEGORIAS, type Registro, type Categoria } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import CategoriaBadge from '../components/CategoriaBadge'
 
-export default function Home() {
-  const [registros,   setRegistros]   = useState<Registro[]>([])
-  const [contagens,   setContagens]   = useState<Record<string, number>>({})
-  const [loading,     setLoading]     = useState(true)
-  const [userEmail,   setUserEmail]   = useState('')
+export default function Home({ user }: { user: User | null }) {
+  const [registros, setRegistros] = useState<Registro[]>([])
+  const [contagens, setContagens] = useState<Record<string, number>>({})
+  const [loading,   setLoading]   = useState(true)
   const [searchParams, setSearchParams] = useSearchParams()
 
   const categoria = searchParams.get('categoria') ?? ''
   const busca     = searchParams.get('q')         ?? ''
-
-  useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setUserEmail(data.user?.email ?? ''))
-  }, [])
 
   useEffect(() => {
     async function carregar() {
@@ -51,45 +47,39 @@ export default function Home() {
 
   function setFiltro(cat: string) {
     const p = new URLSearchParams(searchParams)
-    if (cat) p.set('categoria', cat)
-    else p.delete('categoria')
+    if (cat) p.set('categoria', cat); else p.delete('categoria')
     setSearchParams(p)
   }
 
   function setBusca(q: string) {
     const p = new URLSearchParams(searchParams)
-    if (q) p.set('q', q)
-    else p.delete('q')
+    if (q) p.set('q', q); else p.delete('q')
     setSearchParams(p)
   }
 
-  const totalRegistros = Object.values(contagens).reduce((a, b) => a + b, 0)
+  const total = Object.values(contagens).reduce((a, b) => a + b, 0)
 
   return (
     <div className="min-h-screen bg-[#f8f7f4]">
-      <Navbar userEmail={userEmail} />
-
+      <Navbar userEmail={user?.email} />
       <main className="max-w-6xl mx-auto px-4 py-8">
         <div className="mb-8">
           <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Registros</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            {registros.length} {registros.length === 1 ? 'artigo' : 'artigos'} encontrados
-          </p>
+          <p className="text-sm text-gray-500 mt-1">{registros.length} {registros.length === 1 ? 'artigo' : 'artigos'} encontrados</p>
         </div>
 
         <div className="flex gap-6">
-          {/* Sidebar */}
           <aside className="w-52 flex-shrink-0 space-y-1">
             <button onClick={() => setFiltro('')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition
-                ${!categoria ? 'bg-brand-600 text-white font-medium' : 'text-gray-600 hover:bg-white hover:text-gray-900'}`}>
+                ${!categoria ? 'bg-brand-600 text-white font-medium' : 'text-gray-600 hover:bg-white'}`}>
               <span>Todos</span>
-              <span className={`text-xs ${!categoria ? 'text-brand-200' : 'text-gray-400'}`}>{totalRegistros}</span>
+              <span className={`text-xs ${!categoria ? 'text-brand-200' : 'text-gray-400'}`}>{total}</span>
             </button>
             {CATEGORIAS.map(cat => (
               <button key={cat.value} onClick={() => setFiltro(cat.value)}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition
-                  ${categoria === cat.value ? 'bg-brand-600 text-white font-medium' : 'text-gray-600 hover:bg-white hover:text-gray-900'}`}>
+                  ${categoria === cat.value ? 'bg-brand-600 text-white font-medium' : 'text-gray-600 hover:bg-white'}`}>
                 <span>{cat.label}</span>
                 <span className={`text-xs ${categoria === cat.value ? 'text-brand-200' : 'text-gray-400'}`}>
                   {contagens[cat.value] ?? 0}
@@ -98,7 +88,6 @@ export default function Home() {
             ))}
           </aside>
 
-          {/* Lista */}
           <div className="flex-1 space-y-3">
             <div className="mb-4">
               <input type="search" value={busca} onChange={e => setBusca(e.target.value)}
@@ -120,13 +109,9 @@ export default function Home() {
                         <CategoriaBadge categoria={r.categoria as Categoria} />
                         <span className="text-xs text-gray-400">{formatarData(r.criado_em)}</span>
                       </div>
-                      <h2 className="font-semibold text-gray-900 group-hover:text-brand-600 transition truncate">
-                        {r.titulo}
-                      </h2>
+                      <h2 className="font-semibold text-gray-900 group-hover:text-brand-600 transition truncate">{r.titulo}</h2>
                       {r.conteudo && (
-                        <p className="text-sm text-gray-500 mt-1 line-clamp-2 leading-relaxed">
-                          {resumo(r.conteudo)}
-                        </p>
+                        <p className="text-sm text-gray-500 mt-1 line-clamp-2 leading-relaxed">{resumo(r.conteudo)}</p>
                       )}
                     </div>
                     <svg className="w-4 h-4 text-gray-300 group-hover:text-brand-400 transition flex-shrink-0 mt-1"
