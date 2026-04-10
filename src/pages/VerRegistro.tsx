@@ -1,15 +1,25 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import type { User } from '@supabase/supabase-js'
-import { supabase, type Registro, type Anexo, type Categoria } from '../lib/supabase'
+import { supabase, type Anexo, type CategoriaDB } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import CategoriaBadge from '../components/CategoriaBadge'
+
+interface RegistroCompleto {
+  id: string
+  titulo: string
+  conteudo: string
+  criado_em: string
+  atualizado_em: string
+  categoria_id: string
+  categoria: CategoriaDB | null
+}
 
 export default function VerRegistro({ user }: { user: User | null }) {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
 
-  const [registro,    setRegistro]    = useState<Registro | null>(null)
+  const [registro,    setRegistro]    = useState<RegistroCompleto | null>(null)
   const [anexos,      setAnexos]      = useState<Anexo[]>([])
   const [loading,     setLoading]     = useState(true)
   const [confirmando, setConfirmando] = useState(false)
@@ -18,9 +28,17 @@ export default function VerRegistro({ user }: { user: User | null }) {
   useEffect(() => {
     if (!id) return
     async function carregar() {
-      const { data: reg } = await supabase.from('registros').select('*').eq('id', id).single()
-      const { data: anx } = await supabase.from('anexos').select('*').eq('registro_id', id).order('criado_em')
-      setRegistro(reg as Registro)
+      const { data: reg } = await supabase
+        .from('registros')
+        .select('*, categoria:categorias(id, nome, cor)')
+        .eq('id', id)
+        .single()
+      const { data: anx } = await supabase
+        .from('anexos')
+        .select('*')
+        .eq('registro_id', id)
+        .order('criado_em')
+      setRegistro(reg as unknown as RegistroCompleto)
       setAnexos((anx ?? []) as Anexo[])
       setLoading(false)
     }
@@ -38,6 +56,12 @@ export default function VerRegistro({ user }: { user: User | null }) {
     return new Date(iso).toLocaleDateString('pt-BR', {
       day: '2-digit', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit',
     })
+  }
+
+  function formatarTamanho(bytes: number): string {
+    if (!bytes) return ''
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
   if (loading) return (
@@ -76,7 +100,7 @@ export default function VerRegistro({ user }: { user: User | null }) {
         <article className="bg-white rounded-2xl border border-gray-100 p-8">
           <div className="mb-6">
             <div className="flex items-center justify-between gap-4 mb-3 flex-wrap">
-              <CategoriaBadge categoria={registro.categoria as Categoria} />
+              {registro.categoria && <CategoriaBadge categoria={registro.categoria} />}
               <div className="flex items-center gap-2">
                 <Link to={`/registros/${id}/editar`}
                   className="flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-800 px-3 py-1.5 rounded-lg hover:bg-gray-100 transition">
@@ -127,9 +151,9 @@ export default function VerRegistro({ user }: { user: User | null }) {
               <h3 className="text-sm font-semibold text-gray-700 mb-3">Imagens</h3>
               <div className="grid grid-cols-2 gap-3">
                 {imagens.map(img => (
-                  <a key={img.id} href={img.url} target="_blank" rel="noopener noreferrer">
-                    <img src={img.url} alt={img.nome}
-                      className="w-full rounded-xl border border-gray-100 object-cover hover:opacity-90 transition" />
+                  <a key={img.id} href={img.url} target="_blank" rel="noopener noreferrer"
+                    className="block rounded-xl overflow-hidden border border-gray-100 hover:opacity-90 transition">
+                    <img src={img.url} alt={img.nome} className="w-full object-cover" />
                   </a>
                 ))}
               </div>
@@ -144,8 +168,13 @@ export default function VerRegistro({ user }: { user: User | null }) {
                   <a key={pdf.id} href={pdf.url} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-3 bg-gray-50 border border-gray-100 rounded-xl px-4 py-3 hover:border-brand-200 hover:bg-brand-50 transition group">
                     <span className="text-xl">📄</span>
-                    <span className="text-sm text-gray-700 group-hover:text-brand-700 font-medium truncate">{pdf.nome}</span>
-                    <svg className="w-4 h-4 text-gray-400 group-hover:text-brand-500 ml-auto flex-shrink-0"
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-gray-700 group-hover:text-brand-700 font-medium truncate">{pdf.nome}</p>
+                      {pdf.tamanho > 0 && (
+                        <p className="text-xs text-gray-400">{formatarTamanho(pdf.tamanho)}</p>
+                      )}
+                    </div>
+                    <svg className="w-4 h-4 text-gray-400 group-hover:text-brand-500 flex-shrink-0"
                       fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                         d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />

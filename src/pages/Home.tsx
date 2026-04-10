@@ -1,41 +1,57 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import type { User } from '@supabase/supabase-js'
-import { supabase, CATEGORIAS, type Registro, type Categoria } from '../lib/supabase'
+import { supabase, type CategoriaDB } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import CategoriaBadge from '../components/CategoriaBadge'
 
+interface RegistroLista {
+  id: string
+  titulo: string
+  conteudo: string
+  criado_em: string
+  categoria: CategoriaDB | null
+}
+
 export default function Home({ user }: { user: User | null }) {
-  const [registros, setRegistros] = useState<Registro[]>([])
-  const [contagens, setContagens] = useState<Record<string, number>>({})
-  const [loading,   setLoading]   = useState(true)
+  const [registros,    setRegistros]    = useState<RegistroLista[]>([])
+  const [categorias,   setCategorias]   = useState<CategoriaDB[]>([])
+  const [contagens,    setContagens]    = useState<Record<string, number>>({})
+  const [loading,      setLoading]      = useState(true)
   const [searchParams, setSearchParams] = useSearchParams()
 
-  const categoria = searchParams.get('categoria') ?? ''
-  const busca     = searchParams.get('q')         ?? ''
+  const categoriaFiltro = searchParams.get('categoria') ?? ''
+  const busca           = searchParams.get('q')         ?? ''
+
+  useEffect(() => {
+    supabase.from('categorias').select('*').order('nome').then(({ data }) => {
+      setCategorias((data ?? []) as CategoriaDB[])
+    })
+  }, [])
 
   useEffect(() => {
     async function carregar() {
       setLoading(true)
+
       let query = supabase
         .from('registros')
-        .select('id, titulo, categoria, criado_em, conteudo')
+        .select('id, titulo, conteudo, criado_em, categoria:categorias(id, nome, cor)')
         .order('criado_em', { ascending: false })
 
-      if (categoria) query = query.eq('categoria', categoria)
-      if (busca)     query = query.ilike('titulo', `%${busca}%`)
+      if (categoriaFiltro) query = query.eq('categoria_id', categoriaFiltro)
+      if (busca)           query = query.ilike('titulo', `%${busca}%`)
 
       const { data } = await query
-      setRegistros((data ?? []) as Registro[])
+      setRegistros((data ?? []) as unknown as RegistroLista[])
 
-      const { data: todos } = await supabase.from('registros').select('categoria')
+      const { data: todos } = await supabase.from('registros').select('categoria_id')
       const map: Record<string, number> = {}
-      todos?.forEach(r => { map[r.categoria] = (map[r.categoria] || 0) + 1 })
+      todos?.forEach(r => { if (r.categoria_id) map[r.categoria_id] = (map[r.categoria_id] || 0) + 1 })
       setContagens(map)
       setLoading(false)
     }
     carregar()
-  }, [categoria, busca])
+  }, [categoriaFiltro, busca])
 
   function resumo(html: string) {
     return html.replace(/<[^>]*>/g, '').slice(0, 140) + '...'
@@ -45,9 +61,9 @@ export default function Home({ user }: { user: User | null }) {
     return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
   }
 
-  function setFiltro(cat: string) {
+  function setFiltro(id: string) {
     const p = new URLSearchParams(searchParams)
-    if (cat) p.set('categoria', cat); else p.delete('categoria')
+    if (id) p.set('categoria', id); else p.delete('categoria')
     setSearchParams(p)
   }
 
@@ -72,20 +88,25 @@ export default function Home({ user }: { user: User | null }) {
           <aside className="w-52 flex-shrink-0 space-y-1">
             <button onClick={() => setFiltro('')}
               className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition
-                ${!categoria ? 'bg-brand-600 text-white font-medium' : 'text-gray-600 hover:bg-white'}`}>
+                ${!categoriaFiltro ? 'bg-brand-600 text-white font-medium' : 'text-gray-600 hover:bg-white'}`}>
               <span>Todos</span>
-              <span className={`text-xs ${!categoria ? 'text-brand-200' : 'text-gray-400'}`}>{total}</span>
+              <span className={`text-xs ${!categoriaFiltro ? 'text-brand-200' : 'text-gray-400'}`}>{total}</span>
             </button>
-            {CATEGORIAS.map(cat => (
-              <button key={cat.value} onClick={() => setFiltro(cat.value)}
+            {categorias.map(cat => (
+              <button key={cat.id} onClick={() => setFiltro(cat.id)}
                 className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition
-                  ${categoria === cat.value ? 'bg-brand-600 text-white font-medium' : 'text-gray-600 hover:bg-white'}`}>
-                <span>{cat.label}</span>
-                <span className={`text-xs ${categoria === cat.value ? 'text-brand-200' : 'text-gray-400'}`}>
-                  {contagens[cat.value] ?? 0}
+                  ${categoriaFiltro === cat.id ? 'bg-brand-600 text-white font-medium' : 'text-gray-600 hover:bg-white'}`}>
+                <span>{cat.nome}</span>
+                <span className={`text-xs ${categoriaFiltro === cat.id ? 'text-brand-200' : 'text-gray-400'}`}>
+                  {contagens[cat.id] ?? 0}
                 </span>
               </button>
             ))}
+            {categorias.length === 0 && (
+              <Link to="/categorias" className="block px-3 py-2 text-xs text-brand-600 hover:underline">
+                + Criar categorias
+              </Link>
+            )}
           </aside>
 
           <div className="flex-1 space-y-3">
@@ -106,7 +127,7 @@ export default function Home({ user }: { user: User | null }) {
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1.5">
-                        <CategoriaBadge categoria={r.categoria as Categoria} />
+                        {r.categoria && <CategoriaBadge categoria={r.categoria} />}
                         <span className="text-xs text-gray-400">{formatarData(r.criado_em)}</span>
                       </div>
                       <h2 className="font-semibold text-gray-900 group-hover:text-brand-600 transition truncate">{r.titulo}</h2>

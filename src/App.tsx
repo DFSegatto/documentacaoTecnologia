@@ -3,11 +3,12 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import type { User } from '@supabase/supabase-js'
 
-import Login         from './pages/Login'
-import Home          from './pages/Home'
-import NovoRegistro  from './pages/NovoRegistro'
-import VerRegistro   from './pages/VerRegistro'
+import Login          from './pages/Login'
+import Home           from './pages/Home'
+import NovoRegistro   from './pages/NovoRegistro'
+import VerRegistro    from './pages/VerRegistro'
 import EditarRegistro from './pages/EditarRegistro'
+import Categorias     from './pages/Categorias'
 
 type AuthState = 'loading' | 'authenticated' | 'unauthenticated'
 
@@ -20,8 +21,8 @@ function Spinner() {
 }
 
 function RotaProtegida({ estado, children }: { estado: AuthState; children: React.ReactNode }) {
-  if (estado === 'loading')          return <Spinner />
-  if (estado === 'unauthenticated')  return <Navigate to="/login" replace />
+  if (estado === 'loading')         return <Spinner />
+  if (estado === 'unauthenticated') return <Navigate to="/login" replace />
   return <>{children}</>
 }
 
@@ -34,26 +35,21 @@ export default function App() {
       setUser(data.user ?? null)
       setEstado(data.user ? 'authenticated' : 'unauthenticated')
     })
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       const u = session?.user ?? null
       setUser(u)
       setEstado(u ? 'authenticated' : 'unauthenticated')
     })
-
     return () => subscription.unsubscribe()
   }, [])
 
   return (
     <Routes>
       <Route path="/login" element={
-        estado === 'loading'
-          ? <Spinner />
-          : estado === 'authenticated'
-            ? <Navigate to="/" replace />
-            : <Login />
+        estado === 'loading' ? <Spinner />
+        : estado === 'authenticated' ? <Navigate to="/" replace />
+        : <Login />
       } />
-
       <Route path="/" element={
         <RotaProtegida estado={estado}><Home user={user} /></RotaProtegida>
       } />
@@ -65,6 +61,9 @@ export default function App() {
       } />
       <Route path="/registros/:id/editar" element={
         <RotaProtegida estado={estado}><EditarRegistro user={user} /></RotaProtegida>
+      } />
+      <Route path="/categorias" element={
+        <RotaProtegida estado={estado}><Categorias user={user} /></RotaProtegida>
       } />
       <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>

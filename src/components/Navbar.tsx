@@ -28,7 +28,16 @@ export default function Navbar({ userEmail }: NavbarProps) {
           </span>
         </Link>
 
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <Link to="/categorias"
+            className="flex items-center gap-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 text-sm px-3 py-1.5 rounded-lg transition">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a2 2 0 012-2z" />
+            </svg>
+            <span className="hidden sm:inline">Categorias</span>
+          </Link>
+
           <Link to="/registros/novo"
             className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-3.5 py-1.5 rounded-lg transition">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -36,7 +45,8 @@ export default function Navbar({ userEmail }: NavbarProps) {
             </svg>
             Novo registro
           </Link>
-          <div className="flex items-center gap-2 pl-3 border-l border-gray-100">
+
+          <div className="flex items-center gap-2 pl-2 border-l border-gray-100">
             {userEmail && <span className="text-xs text-gray-500 hidden sm:block">{userEmail}</span>}
             <button onClick={handleLogout} title="Sair"
               className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 transition">

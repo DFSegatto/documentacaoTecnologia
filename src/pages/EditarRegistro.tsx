@@ -1,22 +1,36 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
 import type { User } from '@supabase/supabase-js'
-import { supabase, type Registro, type ArquivoUpload } from '../lib/supabase'
+import { supabase, type ArquivoUpload } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import FormRegistro from '../components/FormRegistro'
 
+interface RegistroRaw {
+  id: string
+  titulo: string
+  conteudo: string
+  categoria_id: string
+}
+
 export default function EditarRegistro({ user }: { user: User | null }) {
-  const { id } = useParams<{ id: string }>()
-  const [registro, setRegistro] = useState<Registro | null>(null)
+  const { id }   = useParams<{ id: string }>()
+  const [registro, setRegistro] = useState<RegistroRaw | null>(null)
   const [anexos,   setAnexos]   = useState<ArquivoUpload[]>([])
   const [loading,  setLoading]  = useState(true)
 
   useEffect(() => {
     if (!id) return
     async function carregar() {
-      const { data: reg } = await supabase.from('registros').select('*').eq('id', id).single()
-      const { data: anx } = await supabase.from('anexos').select('nome, url, tipo').eq('registro_id', id)
-      setRegistro(reg as Registro)
+      const { data: reg } = await supabase
+        .from('registros')
+        .select('id, titulo, conteudo, categoria_id')
+        .eq('id', id)
+        .single()
+      const { data: anx } = await supabase
+        .from('anexos')
+        .select('nome, url, tipo, tamanho')
+        .eq('registro_id', id)
+      setRegistro(reg as RegistroRaw)
       setAnexos((anx ?? []) as ArquivoUpload[])
       setLoading(false)
     }
@@ -60,7 +74,7 @@ export default function EditarRegistro({ user }: { user: User | null }) {
           inicial={{
             id: registro.id,
             titulo: registro.titulo,
-            categoria: registro.categoria,
+            categoria_id: registro.categoria_id,
             conteudo: registro.conteudo,
             anexosExistentes: anexos,
           }}
