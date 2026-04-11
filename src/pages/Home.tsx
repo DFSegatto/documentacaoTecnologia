@@ -184,7 +184,7 @@ export default function Home({ user }: { user: User | null }) {
           <div className="flex-1 space-y-3 min-w-0">
             <div className="mb-4">
               <input type="search" value={busca} onChange={e => setParam('q', e.target.value)}
-                placeholder="Buscar por título..."
+                placeholder="Buscar por título ou conteúdo..."
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent placeholder:text-gray-400 transition" />
             </div>
 
