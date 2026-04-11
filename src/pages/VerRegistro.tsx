@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useParams, useNavigate } from 'react-router-dom'
 import type { User } from '@supabase/supabase-js'
-import { supabase, type Anexo, type CategoriaDB } from '../lib/supabase'
+import { supabase, type Anexo, type CategoriaDB, type Sessao } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import CategoriaBadge from '../components/CategoriaBadge'
 
@@ -11,7 +11,9 @@ interface RegistroCompleto {
   conteudo: string
   criado_em: string
   atualizado_em: string
-  categoria_id: string
+  sessao_id: string | null
+  sessao: Sessao | null
+  categoria_id: string | null
   categoria: CategoriaDB | null
 }
 
@@ -30,7 +32,7 @@ export default function VerRegistro({ user }: { user: User | null }) {
     async function carregar() {
       const { data: reg } = await supabase
         .from('registros')
-        .select('*, categoria:categorias(id, nome, cor)')
+        .select('*, sessao:sessoes(id,nome,cor,descricao,criado_em), categoria:categorias(id,nome,cor,criado_em)')
         .eq('id', id)
         .single()
       const { data: anx } = await supabase

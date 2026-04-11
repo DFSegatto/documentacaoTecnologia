@@ -1,9 +1,18 @@
 -- ============================================================
--- Execute no SQL Editor do Supabase
--- Dashboard → SQL Editor → New Query → Cole e clique em Run
+-- BASE DE CONHECIMENTO — Execute no SQL Editor do Supabase
+-- Dashboard → SQL Editor → New Query → Run
 -- ============================================================
 
--- Tabela de categorias (dinâmicas, criadas pelo usuário)
+-- Sessões (agrupadores de registros por sistema/área)
+create table if not exists sessoes (
+  id        uuid default gen_random_uuid() primary key,
+  nome      text not null,
+  descricao text not null default '',
+  cor       text not null default '#4f46e5',
+  criado_em timestamptz default now()
+);
+
+-- Categorias dinâmicas
 create table if not exists categorias (
   id        uuid default gen_random_uuid() primary key,
   nome      text not null,
@@ -11,18 +20,19 @@ create table if not exists categorias (
   criado_em timestamptz default now()
 );
 
--- Tabela de registros (usa FK para categorias)
+-- Registros
 create table if not exists registros (
   id            uuid default gen_random_uuid() primary key,
   titulo        text not null,
   conteudo      text not null default '',
+  sessao_id     uuid references sessoes(id)    on delete set null,
   categoria_id  uuid references categorias(id) on delete set null,
   criado_por    uuid references auth.users(id) on delete set null,
   criado_em     timestamptz default now(),
   atualizado_em timestamptz default now()
 );
 
--- Tabela de anexos
+-- Anexos
 create table if not exists anexos (
   id          uuid default gen_random_uuid() primary key,
   registro_id uuid references registros(id) on delete cascade not null,
@@ -34,17 +44,15 @@ create table if not exists anexos (
 );
 
 -- Índices
+create index if not exists registros_sessao_idx    on registros(sessao_id);
 create index if not exists registros_categoria_idx on registros(categoria_id);
 create index if not exists registros_criado_em_idx on registros(criado_em desc);
-create index if not exists anexos_registro_id_idx  on anexos(registro_id);
+create index if not exists anexos_registro_idx     on anexos(registro_id);
 
--- Trigger para atualizar atualizado_em automaticamente
+-- Trigger atualizado_em
 create or replace function atualizar_timestamp()
 returns trigger as $$
-begin
-  new.atualizado_em = now();
-  return new;
-end;
+begin new.atualizado_em = now(); return new; end;
 $$ language plpgsql;
 
 create or replace trigger trigger_atualizar_registro
@@ -52,25 +60,31 @@ create or replace trigger trigger_atualizar_registro
   for each row execute function atualizar_timestamp();
 
 -- ============================================================
--- RLS — Apenas usuários autenticados acessam
+-- RLS
 -- ============================================================
+alter table sessoes    enable row level security;
 alter table categorias enable row level security;
-alter table registros   enable row level security;
-alter table anexos      enable row level security;
+alter table registros  enable row level security;
+alter table anexos     enable row level security;
 
-create policy "autenticados leem categorias"   on categorias for select to authenticated using (true);
-create policy "autenticados criam categorias"  on categorias for insert to authenticated with check (true);
-create policy "autenticados editam categorias" on categorias for update to authenticated using (true);
-create policy "autenticados excluem categorias" on categorias for delete to authenticated using (true);
+create policy "auth leem sessoes"    on sessoes    for select to authenticated using (true);
+create policy "auth criam sessoes"   on sessoes    for insert to authenticated with check (true);
+create policy "auth editam sessoes"  on sessoes    for update to authenticated using (true);
+create policy "auth excluem sessoes" on sessoes    for delete to authenticated using (true);
 
-create policy "autenticados leem registros"    on registros for select to authenticated using (true);
-create policy "autenticados criam registros"   on registros for insert to authenticated with check (true);
-create policy "autenticados editam registros"  on registros for update to authenticated using (true);
-create policy "autenticados excluem registros" on registros for delete to authenticated using (true);
+create policy "auth leem categorias"    on categorias for select to authenticated using (true);
+create policy "auth criam categorias"   on categorias for insert to authenticated with check (true);
+create policy "auth editam categorias"  on categorias for update to authenticated using (true);
+create policy "auth excluem categorias" on categorias for delete to authenticated using (true);
 
-create policy "autenticados leem anexos"       on anexos for select to authenticated using (true);
-create policy "autenticados criam anexos"      on anexos for insert to authenticated with check (true);
-create policy "autenticados excluem anexos"    on anexos for delete to authenticated using (true);
+create policy "auth leem registros"    on registros for select to authenticated using (true);
+create policy "auth criam registros"   on registros for insert to authenticated with check (true);
+create policy "auth editam registros"  on registros for update to authenticated using (true);
+create policy "auth excluem registros" on registros for delete to authenticated using (true);
+
+create policy "auth leem anexos"    on anexos for select to authenticated using (true);
+create policy "auth criam anexos"   on anexos for insert to authenticated with check (true);
+create policy "auth excluem anexos" on anexos for delete to authenticated using (true);
 
 -- ============================================================
 -- Storage
@@ -86,8 +100,14 @@ create policy "ver documentos"     on storage.objects for select using (bucket_i
 create policy "excluir documentos" on storage.objects for delete to authenticated using (bucket_id = 'documentos');
 
 -- ============================================================
--- Categorias iniciais de exemplo (opcional — pode apagar)
+-- Dados iniciais de exemplo (remova se quiser partir do zero)
 -- ============================================================
+insert into sessoes (nome, descricao, cor) values
+  ('Apontamento Web', 'Suporte ao módulo de apontamento de horas', '#4f46e5'),
+  ('eDocs',           'Documentos eletrônicos e NF-e',            '#0891b2'),
+  ('ERP',             'Sistema de gestão empresarial',            '#059669')
+on conflict do nothing;
+
 insert into categorias (nome, cor) values
   ('Bug / Erro',       'bg-red-100 text-red-700'),
   ('Procedimento',     'bg-blue-100 text-blue-700'),

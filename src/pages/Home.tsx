@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import type { User } from '@supabase/supabase-js'
-import { supabase, type CategoriaDB } from '../lib/supabase'
+import { supabase, type CategoriaDB, type Sessao } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import CategoriaBadge from '../components/CategoriaBadge'
 
@@ -10,108 +10,171 @@ interface RegistroLista {
   titulo: string
   conteudo: string
   criado_em: string
+  sessao: Sessao | null
   categoria: CategoriaDB | null
 }
 
 export default function Home({ user }: { user: User | null }) {
   const [registros,    setRegistros]    = useState<RegistroLista[]>([])
+  const [sessoes,      setSessoes]      = useState<Sessao[]>([])
   const [categorias,   setCategorias]   = useState<CategoriaDB[]>([])
-  const [contagens,    setContagens]    = useState<Record<string, number>>({})
+  const [contagensSessao,   setContagensSessao]   = useState<Record<string, number>>({})
+  const [contagensCategoria, setContagensCategoria] = useState<Record<string, number>>({})
   const [loading,      setLoading]      = useState(true)
   const [searchParams, setSearchParams] = useSearchParams()
 
+  const sessaoFiltro    = searchParams.get('sessao')    ?? ''
   const categoriaFiltro = searchParams.get('categoria') ?? ''
   const busca           = searchParams.get('q')         ?? ''
 
   useEffect(() => {
-    supabase.from('categorias').select('*').order('nome').then(({ data }) => {
-      setCategorias((data ?? []) as CategoriaDB[])
-    })
+    supabase.from('sessoes').select('*').order('nome').then(({ data }) => setSessoes((data ?? []) as Sessao[]))
+    supabase.from('categorias').select('*').order('nome').then(({ data }) => setCategorias((data ?? []) as CategoriaDB[]))
   }, [])
 
   useEffect(() => {
     async function carregar() {
       setLoading(true)
-
       let query = supabase
         .from('registros')
-        .select('id, titulo, conteudo, criado_em, categoria:categorias(id, nome, cor)')
+        .select('id, titulo, conteudo, criado_em, sessao:sessoes(id,nome,cor,descricao,criado_em), categoria:categorias(id,nome,cor,criado_em)')
         .order('criado_em', { ascending: false })
 
-      if (categoriaFiltro) query = query.eq('categoria_id', categoriaFiltro)
-      if (busca)           query = query.ilike('titulo', `%${busca}%`)
+      if (sessaoFiltro === 'sem-sessao') query = query.is('sessao_id', null)
+      else if (sessaoFiltro)             query = query.eq('sessao_id', sessaoFiltro)
+      if (categoriaFiltro)               query = query.eq('categoria_id', categoriaFiltro)
+      if (busca)                         query = query.ilike('titulo', `%${busca}%`)
 
       const { data } = await query
       setRegistros((data ?? []) as unknown as RegistroLista[])
 
-      const { data: todos } = await supabase.from('registros').select('categoria_id')
-      const map: Record<string, number> = {}
-      todos?.forEach(r => { if (r.categoria_id) map[r.categoria_id] = (map[r.categoria_id] || 0) + 1 })
-      setContagens(map)
+      const { data: todos } = await supabase.from('registros').select('sessao_id, categoria_id')
+      const mapS: Record<string, number> = {}
+      const mapC: Record<string, number> = {}
+      todos?.forEach(r => {
+        const sk = r.sessao_id ?? 'sem-sessao'
+        mapS[sk] = (mapS[sk] || 0) + 1
+        if (r.categoria_id) mapC[r.categoria_id] = (mapC[r.categoria_id] || 0) + 1
+      })
+      setContagensSessao(mapS)
+      setContagensCategoria(mapC)
       setLoading(false)
     }
     carregar()
-  }, [categoriaFiltro, busca])
+  }, [sessaoFiltro, categoriaFiltro, busca])
+
+  function setParam(key: string, value: string) {
+    const p = new URLSearchParams(searchParams)
+    if (value) p.set(key, value); else p.delete(key)
+    // Ao trocar sessão, limpa filtro de categoria
+    if (key === 'sessao') p.delete('categoria')
+    setSearchParams(p)
+  }
 
   function resumo(html: string) {
-    return html.replace(/<[^>]*>/g, '').slice(0, 140) + '...'
+    return html.replace(/<[^>]*>/g, '').slice(0, 130) + '...'
   }
 
   function formatarData(iso: string) {
     return new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
   }
 
-  function setFiltro(id: string) {
-    const p = new URLSearchParams(searchParams)
-    if (id) p.set('categoria', id); else p.delete('categoria')
-    setSearchParams(p)
-  }
+  const total = Object.values(contagensSessao).reduce((a, b) => a + b, 0)
 
-  function setBusca(q: string) {
-    const p = new URLSearchParams(searchParams)
-    if (q) p.set('q', q); else p.delete('q')
-    setSearchParams(p)
-  }
-
-  const total = Object.values(contagens).reduce((a, b) => a + b, 0)
+  // Categorias relevantes para a sessão selecionada
+  const categoriasVisiveis = categoriaFiltro || sessaoFiltro
+    ? categorias.filter(c => contagensCategoria[c.id])
+    : categorias
 
   return (
     <div className="min-h-screen bg-[#f8f7f4]">
       <Navbar userEmail={user?.email} />
       <main className="max-w-6xl mx-auto px-4 py-8">
-        <div className="mb-8">
-          <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Registros</h1>
-          <p className="text-sm text-gray-500 mt-1">{registros.length} {registros.length === 1 ? 'artigo' : 'artigos'} encontrados</p>
+        <div className="mb-6 flex items-start justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-gray-900 tracking-tight">Registros</h1>
+            <p className="text-sm text-gray-500 mt-1">{registros.length} {registros.length === 1 ? 'artigo' : 'artigos'} encontrados</p>
+          </div>
         </div>
 
         <div className="flex gap-6">
-          <aside className="w-52 flex-shrink-0 space-y-1">
-            <button onClick={() => setFiltro('')}
-              className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition
-                ${!categoriaFiltro ? 'bg-brand-600 text-white font-medium' : 'text-gray-600 hover:bg-white'}`}>
-              <span>Todos</span>
-              <span className={`text-xs ${!categoriaFiltro ? 'text-brand-200' : 'text-gray-400'}`}>{total}</span>
-            </button>
-            {categorias.map(cat => (
-              <button key={cat.id} onClick={() => setFiltro(cat.id)}
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition
-                  ${categoriaFiltro === cat.id ? 'bg-brand-600 text-white font-medium' : 'text-gray-600 hover:bg-white'}`}>
-                <span>{cat.nome}</span>
-                <span className={`text-xs ${categoriaFiltro === cat.id ? 'text-brand-200' : 'text-gray-400'}`}>
-                  {contagens[cat.id] ?? 0}
-                </span>
-              </button>
-            ))}
-            {categorias.length === 0 && (
-              <Link to="/categorias" className="block px-3 py-2 text-xs text-brand-600 hover:underline">
-                + Criar categorias
+          {/* Sidebar */}
+          <aside className="w-56 flex-shrink-0 space-y-5">
+            {/* Sessões */}
+            <div>
+              <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1 mb-1.5">Sessões</p>
+              <div className="space-y-0.5">
+                <button onClick={() => setParam('sessao', '')}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition
+                    ${!sessaoFiltro ? 'bg-brand-600 text-white font-medium' : 'text-gray-600 hover:bg-white'}`}>
+                  <span>Todas</span>
+                  <span className={`text-xs ${!sessaoFiltro ? 'text-brand-200' : 'text-gray-400'}`}>{total}</span>
+                </button>
+                {sessoes.map(s => (
+                  <button key={s.id} onClick={() => setParam('sessao', s.id)}
+                    className={`w-full flex items-center gap-2 justify-between px-3 py-2 rounded-lg text-sm transition
+                      ${sessaoFiltro === s.id ? 'font-medium text-white' : 'text-gray-600 hover:bg-white'}`}
+                    style={sessaoFiltro === s.id ? { backgroundColor: s.cor } : {}}>
+                    <span className="flex items-center gap-2 min-w-0">
+                      <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                        style={{ color: sessaoFiltro === s.id ? 'white' : s.cor }}>
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                          d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                      </svg>
+                      <span className="truncate">{s.nome}</span>
+                    </span>
+                    <span className={`text-xs flex-shrink-0 ${sessaoFiltro === s.id ? 'opacity-70' : 'text-gray-400'}`}>
+                      {contagensSessao[s.id] ?? 0}
+                    </span>
+                  </button>
+                ))}
+                <button onClick={() => setParam('sessao', 'sem-sessao')}
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition
+                    ${sessaoFiltro === 'sem-sessao' ? 'bg-gray-700 text-white font-medium' : 'text-gray-400 hover:bg-white hover:text-gray-600'}`}>
+                  <span>Sem sessão</span>
+                  <span className={`text-xs ${sessaoFiltro === 'sem-sessao' ? 'text-gray-300' : 'text-gray-300'}`}>
+                    {contagensSessao['sem-sessao'] ?? 0}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {/* Categorias */}
+            {categoriasVisiveis.length > 0 && (
+              <div>
+                <p className="text-xs font-semibold text-gray-400 uppercase tracking-wide px-1 mb-1.5">Categorias</p>
+                <div className="space-y-0.5">
+                  {categoriaFiltro && (
+                    <button onClick={() => setParam('categoria', '')}
+                      className="w-full text-left px-3 py-1.5 text-xs text-gray-400 hover:text-gray-600 transition">
+                      ← Todas as categorias
+                    </button>
+                  )}
+                  {categoriasVisiveis.map(cat => (
+                    <button key={cat.id} onClick={() => setParam('categoria', categoriaFiltro === cat.id ? '' : cat.id)}
+                      className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition
+                        ${categoriaFiltro === cat.id ? 'bg-gray-100 font-medium' : 'text-gray-600 hover:bg-white'}`}>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${cat.cor}`}>
+                        {cat.nome}
+                      </span>
+                      <span className="text-xs text-gray-400">{contagensCategoria[cat.id] ?? 0}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {sessoes.length === 0 && (
+              <Link to="/sessoes" className="block px-3 py-2 text-xs text-brand-600 hover:underline">
+                + Criar sessões
               </Link>
             )}
           </aside>
 
-          <div className="flex-1 space-y-3">
+          {/* Lista de registros */}
+          <div className="flex-1 space-y-3 min-w-0">
             <div className="mb-4">
-              <input type="search" value={busca} onChange={e => setBusca(e.target.value)}
+              <input type="search" value={busca} onChange={e => setParam('q', e.target.value)}
                 placeholder="Buscar por título..."
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent placeholder:text-gray-400 transition" />
             </div>
@@ -126,7 +189,17 @@ export default function Home({ user }: { user: User | null }) {
                   className="block bg-white rounded-xl border border-gray-100 p-5 hover:border-brand-200 hover:shadow-sm transition group">
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1.5">
+                      <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                        {r.sessao && (
+                          <span className="inline-flex items-center gap-1 text-xs font-medium px-2 py-0.5 rounded-md"
+                            style={{ backgroundColor: r.sessao.cor + '22', color: r.sessao.cor }}>
+                            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                            </svg>
+                            {r.sessao.nome}
+                          </span>
+                        )}
                         {r.categoria && <CategoriaBadge categoria={r.categoria} />}
                         <span className="text-xs text-gray-400">{formatarData(r.criado_em)}</span>
                       </div>
@@ -144,9 +217,14 @@ export default function Home({ user }: { user: User | null }) {
               ))
             ) : (
               <div className="text-center py-20 text-gray-400">
-                <div className="text-4xl mb-3">🗂</div>
+                <div className="text-5xl mb-3">🗂</div>
                 <p className="font-medium text-gray-600">Nenhum registro encontrado</p>
-                <p className="text-sm mt-1">Crie o primeiro usando o botão &quot;Novo registro&quot;</p>
+                <p className="text-sm mt-1">
+                  {sessaoFiltro
+                    ? <Link to={`/registros/novo?sessao=${sessaoFiltro}`} className="text-brand-600 hover:underline">Criar registro nesta sessão</Link>
+                    : 'Crie o primeiro usando o botão "Novo registro"'
+                  }
+                </p>
               </div>
             )}
           </div>

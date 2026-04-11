@@ -1,13 +1,8 @@
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 
-interface NavbarProps {
-  userEmail?: string | null
-}
-
-export default function Navbar({ userEmail }: NavbarProps) {
+export default function Navbar({ userEmail }: { userEmail?: string | null }) {
   const navigate = useNavigate()
-
   async function handleLogout() {
     await supabase.auth.signOut()
     navigate('/login')
@@ -28,7 +23,15 @@ export default function Navbar({ userEmail }: NavbarProps) {
           </span>
         </Link>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1">
+          <Link to="/sessoes"
+            className="flex items-center gap-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 text-sm px-3 py-1.5 rounded-lg transition">
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+            </svg>
+            <span className="hidden sm:inline">Sessões</span>
+          </Link>
           <Link to="/categorias"
             className="flex items-center gap-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 text-sm px-3 py-1.5 rounded-lg transition">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -37,16 +40,14 @@ export default function Navbar({ userEmail }: NavbarProps) {
             </svg>
             <span className="hidden sm:inline">Categorias</span>
           </Link>
-
           <Link to="/registros/novo"
-            className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-3.5 py-1.5 rounded-lg transition">
+            className="flex items-center gap-1.5 bg-brand-600 hover:bg-brand-700 text-white text-sm font-medium px-3.5 py-1.5 rounded-lg transition ml-1">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
             </svg>
             Novo registro
           </Link>
-
-          <div className="flex items-center gap-2 pl-2 border-l border-gray-100">
+          <div className="flex items-center gap-2 pl-2 border-l border-gray-100 ml-1">
             {userEmail && <span className="text-xs text-gray-500 hidden sm:block">{userEmail}</span>}
             <button onClick={handleLogout} title="Sair"
               className="w-8 h-8 rounded-lg hover:bg-gray-100 flex items-center justify-center text-gray-500 transition">

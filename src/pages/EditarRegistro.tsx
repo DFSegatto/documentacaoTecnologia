@@ -9,11 +9,12 @@ interface RegistroRaw {
   id: string
   titulo: string
   conteudo: string
-  categoria_id: string
+  sessao_id: string | null
+  categoria_id: string | null
 }
 
 export default function EditarRegistro({ user }: { user: User | null }) {
-  const { id }   = useParams<{ id: string }>()
+  const { id }     = useParams<{ id: string }>()
   const [registro, setRegistro] = useState<RegistroRaw | null>(null)
   const [anexos,   setAnexos]   = useState<ArquivoUpload[]>([])
   const [loading,  setLoading]  = useState(true)
@@ -23,13 +24,10 @@ export default function EditarRegistro({ user }: { user: User | null }) {
     async function carregar() {
       const { data: reg } = await supabase
         .from('registros')
-        .select('id, titulo, conteudo, categoria_id')
-        .eq('id', id)
-        .single()
+        .select('id, titulo, conteudo, sessao_id, categoria_id')
+        .eq('id', id).single()
       const { data: anx } = await supabase
-        .from('anexos')
-        .select('nome, url, tipo, tamanho')
-        .eq('registro_id', id)
+        .from('anexos').select('nome, url, tipo, tamanho').eq('registro_id', id)
       setRegistro(reg as RegistroRaw)
       setAnexos((anx ?? []) as ArquivoUpload[])
       setLoading(false)
@@ -63,9 +61,7 @@ export default function EditarRegistro({ user }: { user: User | null }) {
         <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
           <Link to="/" className="hover:text-gray-600 transition">Registros</Link>
           <span>/</span>
-          <Link to={`/registros/${id}`} className="hover:text-gray-600 transition truncate max-w-xs">
-            {registro.titulo}
-          </Link>
+          <Link to={`/registros/${id}`} className="hover:text-gray-600 transition truncate max-w-xs">{registro.titulo}</Link>
           <span>/</span>
           <span className="text-gray-700">Editar</span>
         </div>
@@ -74,7 +70,8 @@ export default function EditarRegistro({ user }: { user: User | null }) {
           inicial={{
             id: registro.id,
             titulo: registro.titulo,
-            categoria_id: registro.categoria_id,
+            sessao_id: registro.sessao_id ?? '',
+            categoria_id: registro.categoria_id ?? '',
             conteudo: registro.conteudo,
             anexosExistentes: anexos,
           }}

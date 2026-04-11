@@ -9,6 +9,7 @@ import NovoRegistro   from './pages/NovoRegistro'
 import VerRegistro    from './pages/VerRegistro'
 import EditarRegistro from './pages/EditarRegistro'
 import Categorias     from './pages/Categorias'
+import Sessoes        from './pages/Sessoes'
 
 type AuthState = 'loading' | 'authenticated' | 'unauthenticated'
 
@@ -37,8 +38,7 @@ export default function App() {
     })
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_e, session) => {
       const u = session?.user ?? null
-      setUser(u)
-      setEstado(u ? 'authenticated' : 'unauthenticated')
+      setUser(u); setEstado(u ? 'authenticated' : 'unauthenticated')
     })
     return () => subscription.unsubscribe()
   }, [])
@@ -50,22 +50,13 @@ export default function App() {
         : estado === 'authenticated' ? <Navigate to="/" replace />
         : <Login />
       } />
-      <Route path="/" element={
-        <RotaProtegida estado={estado}><Home user={user} /></RotaProtegida>
-      } />
-      <Route path="/registros/novo" element={
-        <RotaProtegida estado={estado}><NovoRegistro user={user} /></RotaProtegida>
-      } />
-      <Route path="/registros/:id" element={
-        <RotaProtegida estado={estado}><VerRegistro user={user} /></RotaProtegida>
-      } />
-      <Route path="/registros/:id/editar" element={
-        <RotaProtegida estado={estado}><EditarRegistro user={user} /></RotaProtegida>
-      } />
-      <Route path="/categorias" element={
-        <RotaProtegida estado={estado}><Categorias user={user} /></RotaProtegida>
-      } />
-      <Route path="*" element={<Navigate to="/" replace />} />
+      <Route path="/"                      element={<RotaProtegida estado={estado}><Home user={user} /></RotaProtegida>} />
+      <Route path="/registros/novo"        element={<RotaProtegida estado={estado}><NovoRegistro user={user} /></RotaProtegida>} />
+      <Route path="/registros/:id"         element={<RotaProtegida estado={estado}><VerRegistro user={user} /></RotaProtegida>} />
+      <Route path="/registros/:id/editar"  element={<RotaProtegida estado={estado}><EditarRegistro user={user} /></RotaProtegida>} />
+      <Route path="/categorias"            element={<RotaProtegida estado={estado}><Categorias user={user} /></RotaProtegida>} />
+      <Route path="/sessoes"               element={<RotaProtegida estado={estado}><Sessoes user={user} /></RotaProtegida>} />
+      <Route path="*"                      element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
