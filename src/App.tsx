@@ -3,13 +3,15 @@ import { Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase'
 import type { User } from '@supabase/supabase-js'
 
-import Login          from './pages/Login'
-import Home           from './pages/Home'
-import NovoRegistro   from './pages/NovoRegistro'
-import VerRegistro    from './pages/VerRegistro'
-import EditarRegistro from './pages/EditarRegistro'
-import Categorias     from './pages/Categorias'
-import Sessoes        from './pages/Sessoes'
+import Login           from './pages/Login'
+import Home            from './pages/Home'
+import NovoRegistro    from './pages/NovoRegistro'
+import VerRegistro     from './pages/VerRegistro'
+import EditarRegistro  from './pages/EditarRegistro'
+import Categorias      from './pages/Categorias'
+import Sessoes         from './pages/Sessoes'
+import Historico       from './pages/Historico'
+import RestaurarVersao from './pages/RestaurarVersao'
 
 type AuthState = 'loading' | 'authenticated' | 'unauthenticated'
 
@@ -43,6 +45,10 @@ export default function App() {
     return () => subscription.unsubscribe()
   }, [])
 
+  const P = ({ children }: { children: React.ReactNode }) => (
+    <RotaProtegida estado={estado}>{children}</RotaProtegida>
+  )
+
   return (
     <Routes>
       <Route path="/login" element={
@@ -50,13 +56,15 @@ export default function App() {
         : estado === 'authenticated' ? <Navigate to="/" replace />
         : <Login />
       } />
-      <Route path="/"                      element={<RotaProtegida estado={estado}><Home user={user} /></RotaProtegida>} />
-      <Route path="/registros/novo"        element={<RotaProtegida estado={estado}><NovoRegistro user={user} /></RotaProtegida>} />
-      <Route path="/registros/:id"         element={<RotaProtegida estado={estado}><VerRegistro user={user} /></RotaProtegida>} />
-      <Route path="/registros/:id/editar"  element={<RotaProtegida estado={estado}><EditarRegistro user={user} /></RotaProtegida>} />
-      <Route path="/categorias"            element={<RotaProtegida estado={estado}><Categorias user={user} /></RotaProtegida>} />
-      <Route path="/sessoes"               element={<RotaProtegida estado={estado}><Sessoes user={user} /></RotaProtegida>} />
-      <Route path="*"                      element={<Navigate to="/" replace />} />
+      <Route path="/"                                element={<P><Home user={user} /></P>} />
+      <Route path="/registros/novo"                  element={<P><NovoRegistro user={user} /></P>} />
+      <Route path="/registros/:id"                   element={<P><VerRegistro user={user} /></P>} />
+      <Route path="/registros/:id/editar"            element={<P><EditarRegistro user={user} /></P>} />
+      <Route path="/registros/:id/historico"         element={<P><Historico user={user} /></P>} />
+      <Route path="/registros/:id/restaurar/:versaoId" element={<P><RestaurarVersao user={user} /></P>} />
+      <Route path="/categorias"                      element={<P><Categorias user={user} /></P>} />
+      <Route path="/sessoes"                         element={<P><Sessoes user={user} /></P>} />
+      <Route path="*"                                element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

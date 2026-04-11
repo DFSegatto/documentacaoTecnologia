@@ -70,11 +70,30 @@ export default function FormRegistro({ inicial, modo }: Props) {
         if (error) throw error
         registroId = data.id
       } else {
+        // Busca estado atual para salvar no histórico antes de atualizar
+        const { data: atual } = await supabase
+          .from('registros')
+          .select('titulo, conteudo, editado_por')
+          .eq('id', inicial!.id)
+          .single()
+
+        const { data: { user: currentUser } } = await supabase.auth.getUser()
+
         const { error } = await supabase
           .from('registros')
-          .update({ ...payload, atualizado_em: new Date().toISOString() })
+          .update({ ...payload, atualizado_em: new Date().toISOString(), editado_por: currentUser?.id })
           .eq('id', inicial!.id)
         if (error) throw error
+
+        // Salva snapshot no histórico
+        if (atual) {
+          await supabase.from('registro_historico').insert({
+            registro_id: inicial!.id,
+            titulo:      atual.titulo,
+            conteudo:    atual.conteudo,
+            editado_por: currentUser?.id,
+          })
+        }
       }
 
       await supabase.from('anexos').delete().eq('registro_id', registroId)

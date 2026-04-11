@@ -43,7 +43,10 @@ export default function Home({ user }: { user: User | null }) {
       if (sessaoFiltro === 'sem-sessao') query = query.is('sessao_id', null)
       else if (sessaoFiltro)             query = query.eq('sessao_id', sessaoFiltro)
       if (categoriaFiltro)               query = query.eq('categoria_id', categoriaFiltro)
-      if (busca)                         query = query.ilike('titulo', `%${busca}%`)
+      if (busca) {
+        // Busca em título E conteúdo (remove tags HTML do conteúdo no banco via ilike)
+        query = query.or(`titulo.ilike.%${busca}%,conteudo.ilike.%${busca}%`)
+      }
 
       const { data } = await query
       setRegistros((data ?? []) as unknown as RegistroLista[])
@@ -71,8 +74,14 @@ export default function Home({ user }: { user: User | null }) {
     setSearchParams(p)
   }
 
-  function resumo(html: string) {
-    return html.replace(/<[^>]*>/g, '').slice(0, 130) + '...'
+  function resumo(html: string, termo: string = '') {
+    const texto = html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()
+    if (!termo) return texto.slice(0, 130) + '...'
+    const idx = texto.toLowerCase().indexOf(termo.toLowerCase())
+    if (idx === -1) return texto.slice(0, 130) + '...'
+    const start = Math.max(0, idx - 40)
+    const end   = Math.min(texto.length, idx + termo.length + 80)
+    return (start > 0 ? '...' : '') + texto.slice(start, end) + (end < texto.length ? '...' : '')
   }
 
   function formatarData(iso: string) {
@@ -204,8 +213,16 @@ export default function Home({ user }: { user: User | null }) {
                         <span className="text-xs text-gray-400">{formatarData(r.criado_em)}</span>
                       </div>
                       <h2 className="font-semibold text-gray-900 group-hover:text-brand-600 transition truncate">{r.titulo}</h2>
+                      {busca && r.titulo.toLowerCase().indexOf(busca.toLowerCase()) === -1 && r.conteudo.toLowerCase().indexOf(busca.toLowerCase()) !== -1 && (
+                        <span className="inline-flex items-center gap-1 text-xs text-amber-600 mt-0.5">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                          </svg>
+                          Encontrado no conteúdo
+                        </span>
+                      )}
                       {r.conteudo && (
-                        <p className="text-sm text-gray-500 mt-1 line-clamp-2 leading-relaxed">{resumo(r.conteudo)}</p>
+                        <p className="text-sm text-gray-500 mt-1 line-clamp-2 leading-relaxed">{resumo(r.conteudo, busca)}</p>
                       )}
                     </div>
                     <svg className="w-4 h-4 text-gray-300 group-hover:text-brand-400 transition flex-shrink-0 mt-1"

@@ -115,3 +115,37 @@ insert into categorias (nome, cor) values
   ('Configuração',     'bg-purple-100 text-purple-700'),
   ('Outro',            'bg-gray-100 text-gray-700')
 on conflict do nothing;
+
+
+-- ============================================================
+-- ATUALIZAÇÃO: Histórico de edições e busca no conteúdo
+-- Execute este bloco se já tinha o banco configurado antes
+-- ============================================================
+
+-- Coluna editado_por nos registros
+alter table registros add column if not exists editado_por uuid references auth.users(id) on delete set null;
+
+-- Tabela de histórico de edições
+create table if not exists registro_historico (
+  id          uuid default gen_random_uuid() primary key,
+  registro_id uuid references registros(id) on delete cascade not null,
+  titulo      text not null,
+  conteudo    text not null default '',
+  editado_por uuid references auth.users(id) on delete set null,
+  editado_em  timestamptz default now()
+);
+
+create index if not exists historico_registro_idx on registro_historico(registro_id);
+create index if not exists historico_editado_em_idx on registro_historico(editado_em desc);
+
+-- RLS para histórico
+alter table registro_historico enable row level security;
+
+create policy "auth leem historico"   on registro_historico for select to authenticated using (true);
+create policy "auth criam historico"  on registro_historico for insert to authenticated with check (true);
+create policy "auth excluem historico" on registro_historico for delete to authenticated using (true);
+
+-- Índice de busca full-text no título e conteúdo (português)
+-- Melhora muito a performance da busca em bases grandes
+create index if not exists registros_busca_idx on registros
+  using gin(to_tsvector('portuguese', titulo || ' ' || regexp_replace(conteudo, '<[^>]*>', ' ', 'g')));

@@ -27,6 +27,7 @@ export interface Registro {
   sessao_id: string | null
   categoria_id: string | null
   criado_por: string
+  editado_por: string | null
   criado_em: string
   atualizado_em: string
 }
@@ -46,6 +47,17 @@ export interface ArquivoUpload {
   url: string
   tipo: 'imagem' | 'pdf'
   tamanho: number
+}
+
+
+export interface HistoricoRegistro {
+  id: string
+  registro_id: string
+  titulo: string
+  conteudo: string
+  editado_por: string | null
+  editado_em: string
+  editor_email?: string
 }
 
 export const CORES_SESSAO = [
