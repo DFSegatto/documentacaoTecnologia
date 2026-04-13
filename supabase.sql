@@ -149,3 +149,52 @@ create policy "auth excluem historico" on registro_historico for delete to authe
 -- Melhora muito a performance da busca em bases grandes
 create index if not exists registros_busca_idx on registros
   using gin(to_tsvector('portuguese', titulo || ' ' || regexp_replace(conteudo, '<[^>]*>', ' ', 'g')));
+
+
+-- ============================================================
+-- ATUALIZAÇÃO: Keep-alive e configurações do sistema
+-- Execute este bloco se já tinha o banco configurado antes
+-- ============================================================
+
+-- Tabela de configurações gerais do sistema
+create table if not exists configuracoes (
+  chave     text primary key,
+  valor     text not null,
+  criado_em timestamptz default now()
+);
+
+alter table configuracoes enable row level security;
+create policy "auth leem configuracoes"   on configuracoes for select to authenticated using (true);
+create policy "auth editam configuracoes" on configuracoes for update to authenticated using (true);
+create policy "auth criam configuracoes"  on configuracoes for insert to authenticated with check (true);
+
+-- Tabela de log das verificações automáticas de keep-alive
+create table if not exists keepalive_log (
+  id                 uuid default gen_random_uuid() primary key,
+  verificado_em      timestamptz not null,
+  ultima_atividade   timestamptz not null,
+  dias_sem_movimento int not null,
+  alerta_enviado     boolean not null default false,
+  email_destino      text,
+  criado_em          timestamptz default now()
+);
+
+alter table keepalive_log enable row level security;
+create policy "auth leem logs"    on keepalive_log for select to authenticated using (true);
+create policy "service cria logs" on keepalive_log for insert with check (true);
+
+-- Cron diário às 9h UTC (execute após fazer deploy da Edge Function)
+-- select cron.schedule(
+--   'keepalive-check-diario',
+--   '0 9 * * *',
+--   $$
+--   select net.http_post(
+--     url     := current_setting('app.supabase_url') || '/functions/v1/keepalive-check',
+--     headers := jsonb_build_object(
+--       'Content-Type',  'application/json',
+--       'Authorization', 'Bearer ' || current_setting('app.supabase_anon_key')
+--     ),
+--     body    := '{}'::jsonb
+--   );
+--   $$
+-- );
