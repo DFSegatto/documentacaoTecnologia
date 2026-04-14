@@ -10,7 +10,13 @@ export interface Sessao {
   nome: string
   descricao: string
   cor: string
+  parent_id: string | null  // null = sessão raiz, preenchido = sub-sessão
   criado_em: string
+}
+
+// Sessão com sub-sessões filhas já agrupadas (usado na sidebar e em listas)
+export interface SessaoComFilhas extends Sessao {
+  filhas: Sessao[]
 }
 
 export interface CategoriaDB {
@@ -49,7 +55,6 @@ export interface ArquivoUpload {
   tamanho: number
 }
 
-
 export interface HistoricoRegistro {
   id: string
   registro_id: string
@@ -58,6 +63,18 @@ export interface HistoricoRegistro {
   editado_por: string | null
   editado_em: string
   editor_email?: string
+}
+
+// Agrupa lista plana de sessões em árvore pai → filhas
+export function agruparSessoes(sessoes: Sessao[]): SessaoComFilhas[] {
+  const raizes  = sessoes.filter(s => !s.parent_id)
+  const filhas  = sessoes.filter(s =>  s.parent_id)
+  return raizes.map(r => ({
+    ...r,
+    filhas: filhas
+      .filter(f => f.parent_id === r.id)
+      .sort((a, b) => a.nome.localeCompare(b.nome)),
+  }))
 }
 
 export const CORES_SESSAO = [

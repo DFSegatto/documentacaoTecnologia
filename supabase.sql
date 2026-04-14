@@ -198,3 +198,36 @@ create policy "service cria logs" on keepalive_log for insert with check (true);
 --   );
 --   $$
 -- );
+
+
+-- ============================================================
+-- ATUALIZAÇÃO: Sub-sessões (parent_id na tabela sessoes)
+-- Execute este bloco se já tinha o banco configurado antes
+-- ============================================================
+
+-- Adiciona coluna de hierarquia (referência para sessão pai)
+alter table sessoes
+  add column if not exists parent_id uuid references sessoes(id) on delete set null;
+
+-- Índice para buscar filhas rapidamente
+create index if not exists sessoes_parent_idx on sessoes(parent_id);
+
+-- Garante que sub-sessões não virem pais de outras sub-sessões (máx. 2 níveis)
+-- A validação principal é feita no frontend, mas esta função ajuda como segurança extra
+create or replace function validar_profundidade_sessao()
+returns trigger as $$
+begin
+  if new.parent_id is not null then
+    if exists (
+      select 1 from sessoes where id = new.parent_id and parent_id is not null
+    ) then
+      raise exception 'Não é possível criar sub-sessão de uma sub-sessão (máximo 2 níveis).';
+    end if;
+  end if;
+  return new;
+end;
+$$ language plpgsql;
+
+create or replace trigger trigger_validar_sessao
+  before insert or update on sessoes
+  for each row execute function validar_profundidade_sessao();

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
-import { supabase, type CategoriaDB, type Sessao, type ArquivoUpload } from '../lib/supabase'
+import { supabase, agruparSessoes, type CategoriaDB, type Sessao, type SessaoComFilhas, type ArquivoUpload } from '../lib/supabase'
 import Editor from './Editor'
 import UploadAnexos from './UploadAnexos'
 
@@ -28,13 +28,16 @@ export default function FormRegistro({ inicial, modo }: Props) {
   const [conteudo,    setConteudo]    = useState(inicial?.conteudo    ?? '')
   const [anexos,      setAnexos]      = useState<ArquivoUpload[]>(inicial?.anexosExistentes ?? [])
   const [sessoes,     setSessoes]     = useState<Sessao[]>([])
+  const [arvore,      setArvore]      = useState<SessaoComFilhas[]>([])
   const [categorias,  setCategorias]  = useState<CategoriaDB[]>([])
   const [salvando,    setSalvando]    = useState(false)
   const [erro,        setErro]        = useState('')
 
   useEffect(() => {
     supabase.from('sessoes').select('*').order('nome').then(({ data }) => {
-      setSessoes((data ?? []) as Sessao[])
+      const lista = (data ?? []) as Sessao[]
+      setSessoes(lista)
+      setArvore(agruparSessoes(lista))
     })
     supabase.from('categorias').select('*').order('nome').then(({ data }) => {
       const cats = (data ?? []) as CategoriaDB[]
@@ -142,17 +145,34 @@ export default function FormRegistro({ inicial, modo }: Props) {
                 ${!sessaoId ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}>
               Sem sessão
             </button>
-            {sessoes.map(s => (
-              <button key={s.id} type="button" onClick={() => setSessaoId(s.id)}
-                className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium transition border-2
-                  ${sessaoId === s.id ? 'text-white border-transparent' : 'bg-white border-transparent hover:border-gray-200'}`}
-                style={sessaoId === s.id ? { backgroundColor: s.cor } : { color: s.cor, borderColor: s.cor + '44' }}>
-                <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
-                    d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
-                </svg>
-                {s.nome}
-              </button>
+            {arvore.map(sessao => (
+              <div key={sessao.id} className="flex flex-col gap-1.5">
+                {/* Sessão raiz */}
+                <button type="button" onClick={() => setSessaoId(sessao.id)}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium transition border-2
+                    ${sessaoId === sessao.id ? 'text-white border-transparent' : 'bg-white border-transparent hover:border-gray-200'}`}
+                  style={sessaoId === sessao.id ? { backgroundColor: sessao.cor } : { color: sessao.cor, borderColor: sessao.cor + '44' }}>
+                  <svg className="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                      d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                  </svg>
+                  {sessao.nome}
+                </button>
+                {/* Sub-sessões */}
+                {sessao.filhas.map(filha => (
+                  <button key={filha.id} type="button" onClick={() => setSessaoId(filha.id)}
+                    className={`flex items-center gap-1 pl-5 pr-3 py-1 rounded-lg text-xs font-medium transition border-2
+                      ${sessaoId === filha.id ? 'text-white border-transparent' : 'bg-white border-transparent hover:border-gray-200'}`}
+                    style={sessaoId === filha.id ? { backgroundColor: filha.cor } : { color: filha.cor, borderColor: filha.cor + '33' }}>
+                    <span className="text-gray-300 mr-0.5" style={{ fontSize: 10 }}>└</span>
+                    <svg className="w-3 h-3 flex-shrink-0 opacity-80" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                        d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    </svg>
+                    {filha.nome}
+                  </button>
+                ))}
+              </div>
             ))}
           </div>
         )}
