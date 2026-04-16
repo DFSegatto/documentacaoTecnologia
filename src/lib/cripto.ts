@@ -13,10 +13,10 @@ const SALT = 'suporte-docs-credentials-v1'
 
 /** Deriva uma CryptoKey AES-256-GCM a partir do userId */
 async function derivarChave(userId: string): Promise<CryptoKey> {
-  const enc     = new TextEncoder()
-  const keyMat  = await crypto.subtle.importKey(
+  const enc    = new TextEncoder()
+  const keyMat = await crypto.subtle.importKey(
     'raw',
-    enc.encode(userId + SALT),
+    enc.encode(userId + SALT).buffer as ArrayBuffer,
     { name: 'PBKDF2' },
     false,
     ['deriveKey']
@@ -24,7 +24,7 @@ async function derivarChave(userId: string): Promise<CryptoKey> {
   return crypto.subtle.deriveKey(
     {
       name:       'PBKDF2',
-      salt:       enc.encode(SALT),
+      salt:       enc.encode(SALT).buffer as ArrayBuffer,
       iterations: 100_000,
       hash:       'SHA-256',
     },
@@ -40,9 +40,10 @@ function bufParaBase64(buf: ArrayBuffer): string {
   return btoa(String.fromCharCode(...new Uint8Array(buf)))
 }
 
-/** Converte string base64 para Uint8Array */
-function base64ParaBuf(b64: string): Uint8Array {
-  return new Uint8Array([...atob(b64)].map(c => c.charCodeAt(0)))
+/** Converte string base64 para ArrayBuffer */
+function base64ParaBuf(b64: string): ArrayBuffer {
+  const bytes = new Uint8Array([...atob(b64)].map(c => c.charCodeAt(0)))
+  return bytes.buffer as ArrayBuffer
 }
 
 /**
@@ -58,10 +59,10 @@ export async function criptografar(texto: string, userId: string): Promise<strin
   const cifrado = await crypto.subtle.encrypt(
     { name: 'AES-GCM', iv },
     chave,
-    enc.encode(texto)
+    enc.encode(texto).buffer as ArrayBuffer
   )
 
-  return `${bufParaBase64(iv)}:${bufParaBase64(cifrado)}`
+  return `${bufParaBase64(iv.buffer as ArrayBuffer)}:${bufParaBase64(cifrado)}`
 }
 
 /**
@@ -78,8 +79,8 @@ export async function descriptografar(cifrado: string, userId: string): Promise<
     const iv    = base64ParaBuf(ivB64)
     const dados = base64ParaBuf(dadosB64)
 
-    const dec     = new TextDecoder()
-    const texto   = await crypto.subtle.decrypt(
+    const dec   = new TextDecoder()
+    const texto = await crypto.subtle.decrypt(
       { name: 'AES-GCM', iv },
       chave,
       dados
