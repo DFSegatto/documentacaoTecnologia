@@ -13,6 +13,7 @@ interface RegistroFormData {
   conteudo: string
   privado?: boolean
   temCredencial?: boolean
+  credenciaisExistentes?: CredencialForm[]
   anexosExistentes?: ArquivoUpload[]
 }
 
@@ -31,7 +32,11 @@ export default function FormRegistro({ inicial, modo }: Props) {
   const [conteudo,      setConteudo]      = useState(inicial?.conteudo     ?? '')
   const [privado,       setPrivado]       = useState(inicial?.privado      ?? false)
   const [comCredencial, setComCredencial] = useState(inicial?.temCredencial ?? false)
-  const [credenciais,   setCredenciais]   = useState<CredencialForm[]>([{ ...CREDENCIAL_VAZIA }])
+  const [credenciais,   setCredenciais]   = useState<CredencialForm[]>(
+    inicial?.credenciaisExistentes?.length
+      ? inicial.credenciaisExistentes
+      : [{ ...CREDENCIAL_VAZIA }]
+  )
   const [anexos,        setAnexos]        = useState<ArquivoUpload[]>(inicial?.anexosExistentes ?? [])
   const [sessoes,       setSessoes]       = useState<Sessao[]>([])
   const [arvore,        setArvore]        = useState<SessaoComFilhas[]>([])
@@ -116,12 +121,41 @@ export default function FormRegistro({ inicial, modo }: Props) {
       }
 
       // Salvar credenciais — apaga todas e reinserindo na ordem
+      // Na edição, busca senhas cifradas atuais para reutilizar se campo senha estiver vazio
+      let senhasAtuais: Record<number, string> = {}
+      if (modo === 'editar' && comCredencial) {
+        const { data: credsAtuais } = await supabase
+          .from('credenciais')
+          .select('ordem, senha_cifrada')
+          .eq('registro_id', registroId)
+          .order('ordem', { ascending: true })
+        credsAtuais?.forEach(c => { senhasAtuais[c.ordem] = c.senha_cifrada })
+      }
+
       await supabase.from('credenciais').delete().eq('registro_id', registroId)
 
       if (comCredencial && credenciais.length > 0) {
         const paraInserir = await Promise.all(
           credenciais.map(async (cred, idx) => {
-            const cifrada = await criptografarCredencial(cred, user.id)
+            // Se senha vazia na edição, reutiliza a cifrada existente
+            const credParaCifrar = { ...cred }
+            if (!credParaCifrar.senha && modo === 'editar' && senhasAtuais[idx]) {
+              // Usa a senha cifrada existente diretamente
+              const cifrada = await criptografarCredencial({ ...credParaCifrar, senha: '' }, user.id)
+              return {
+                registro_id:   registroId,
+                tipo:          cifrada.tipo,
+                label:         cifrada.label,
+                host:          cifrada.host,
+                porta:         cifrada.porta,
+                usuario:       cifrada.usuario,
+                senha_cifrada: senhasAtuais[idx], // mantém a cifrada original
+                dominio:       cifrada.dominio,
+                observacoes:   cifrada.observacoes,
+                ordem:         idx,
+              }
+            }
+            const cifrada = await criptografarCredencial(credParaCifrar, user.id)
             return {
               registro_id:   registroId,
               tipo:          cifrada.tipo,
@@ -318,6 +352,7 @@ export default function FormRegistro({ inicial, modo }: Props) {
                   credencial={cred}
                   indice={idx}
                   total={credenciais.length}
+                  modoEdicao={modo === 'editar'}
                   onChange={dados => atualizarCredencial(idx, dados)}
                   onRemover={() => removerCredencial(idx)}
                 />

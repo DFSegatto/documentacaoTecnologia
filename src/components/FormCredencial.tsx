@@ -22,11 +22,12 @@ interface Props {
   credencial: CredencialForm
   indice: number
   total: number
+  modoEdicao?: boolean
   onChange: (dados: CredencialForm) => void
   onRemover: () => void
 }
 
-export default function FormCredencial({ credencial, indice, total, onChange, onRemover }: Props) {
+export default function FormCredencial({ credencial, indice, total, modoEdicao, onChange, onRemover }: Props) {
   const [mostrarSenha, setMostrarSenha] = useState(false)
 
   function atualizar(campo: Partial<CredencialForm>) {
@@ -150,7 +151,7 @@ export default function FormCredencial({ credencial, indice, total, onChange, on
                 type={mostrarSenha ? 'text' : 'password'}
                 value={credencial.senha}
                 onChange={e => atualizar({ senha: e.target.value })}
-                placeholder="••••••••" autoComplete="new-password"
+                placeholder={modoEdicao && !credencial.senha ? "Manter senha atual (deixe vazio)" : "••••••••"} autoComplete="new-password"
                 className="w-full px-3 py-2 pr-8 rounded-lg border border-gray-200 text-sm focus:outline-none
                            focus:ring-2 focus:ring-brand-600 focus:border-transparent transition
                            placeholder:text-gray-300 font-mono" />
