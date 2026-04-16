@@ -231,3 +231,189 @@ $$ language plpgsql;
 create or replace trigger trigger_validar_sessao
   before insert or update on sessoes
   for each row execute function validar_profundidade_sessao();
+
+
+-- ============================================================
+-- ATUALIZAÇÃO: Registros privados e credenciais criptografadas
+-- Execute este bloco se já tinha o banco configurado antes
+-- ============================================================
+
+-- 1. Coluna privado na tabela registros
+alter table registros add column if not exists privado boolean not null default false;
+
+create index if not exists registros_privado_idx on registros(privado);
+
+-- 2. Tabela de credenciais (senhas sempre cifradas — AES-256-GCM no cliente)
+create table if not exists credenciais (
+  id            uuid default gen_random_uuid() primary key,
+  registro_id   uuid references registros(id) on delete cascade not null unique,
+  tipo          text not null default 'rdp'
+                  check (tipo in ('rdp','vpn','ssh','ftp','http','outro')),
+  host          text not null default '',
+  porta         text not null default '',
+  usuario       text not null default '',
+  senha_cifrada text not null default '',   -- NUNCA texto claro
+  dominio       text not null default '',
+  observacoes   text not null default '',
+  criado_em     timestamptz default now()
+);
+
+create index if not exists credenciais_registro_idx on credenciais(registro_id);
+
+-- 3. RLS para credenciais — só o criador do registro acessa
+alter table credenciais enable row level security;
+
+create policy "dono le credenciais"
+  on credenciais for select
+  to authenticated
+  using (
+    exists (
+      select 1 from registros r
+      where r.id = credenciais.registro_id
+        and r.criado_por = auth.uid()
+    )
+  );
+
+create policy "dono cria credenciais"
+  on credenciais for insert
+  to authenticated
+  with check (
+    exists (
+      select 1 from registros r
+      where r.id = credenciais.registro_id
+        and r.criado_por = auth.uid()
+    )
+  );
+
+create policy "dono atualiza credenciais"
+  on credenciais for update
+  to authenticated
+  using (
+    exists (
+      select 1 from registros r
+      where r.id = credenciais.registro_id
+        and r.criado_por = auth.uid()
+    )
+  );
+
+create policy "dono exclui credenciais"
+  on credenciais for delete
+  to authenticated
+  using (
+    exists (
+      select 1 from registros r
+      where r.id = credenciais.registro_id
+        and r.criado_por = auth.uid()
+    )
+  );
+
+-- 4. Atualizar políticas de registros para respeitar privacidade
+-- Remove políticas antigas e recria com lógica de privado
+
+drop policy if exists "autenticados leem registros"   on registros;
+drop policy if exists "auth leem registros"           on registros;
+
+-- Regra: registros públicos → qualquer autenticado lê
+--        registros privados → só o criador lê
+create policy "leitura de registros com privacidade"
+  on registros for select
+  to authenticated
+  using (
+    privado = false
+    or criado_por = auth.uid()
+  );
+
+-- 5. Atualizar política de histórico para respeitar privacidade
+drop policy if exists "auth leem historico" on registro_historico;
+
+create policy "leitura de historico com privacidade"
+  on registro_historico for select
+  to authenticated
+  using (
+    exists (
+      select 1 from registros r
+      where r.id = registro_historico.registro_id
+        and (r.privado = false or r.criado_por = auth.uid())
+    )
+  );
+
+-- 6. Atualizar política de anexos para respeitar privacidade
+drop policy if exists "autenticados leem anexos" on anexos;
+drop policy if exists "auth leem anexos"         on anexos;
+
+create policy "leitura de anexos com privacidade"
+  on anexos for select
+  to authenticated
+  using (
+    exists (
+      select 1 from registros r
+      where r.id = anexos.registro_id
+        and (r.privado = false or r.criado_por = auth.uid())
+    )
+  );
+
+
+-- ============================================================
+-- ATUALIZAÇÃO: Mural de avisos
+-- ============================================================
+
+create table if not exists avisos (
+  id           uuid default gen_random_uuid() primary key,
+  tipo         text not null default 'novidade'
+                 check (tipo in ('novidade','melhoria','correcao','aviso')),
+  titulo       text not null,
+  descricao    text not null default '',
+  versao       text,
+  ativo        boolean not null default true,
+  publicado_em timestamptz default now()
+);
+
+alter table avisos enable row level security;
+
+-- Qualquer usuário autenticado pode ler
+create policy "auth leem avisos" on avisos for select to authenticated using (true);
+-- Apenas service role pode inserir/editar (via SQL direto no Supabase)
+create policy "service gerencia avisos" on avisos for all using (auth.role() = 'service_role');
+
+-- ── Avisos desta versão ──────────────────────────────────────────────────
+insert into avisos (tipo, titulo, descricao, versao, publicado_em) values
+
+('novidade',
+ 'Registros privados com credenciais criptografadas',
+ 'Crie registros privados visíveis apenas para você. Salve acessos RDP, VPN, SSH e FTP com senhas protegidas por AES-256-GCM — criptografadas no navegador antes de chegar ao banco.',
+ '1.6', now()),
+
+('novidade',
+ 'Mural de novidades do sistema',
+ 'Este painel exibe as atualizações mais recentes do sistema. Você pode dispensar cada aviso individualmente ou todos de uma vez. Os avisos não voltam após dispensados.',
+ '1.6', now()),
+
+('melhoria',
+ 'Paginação na listagem de registros',
+ 'A lista de registros agora carrega apenas 10 itens por vez, com navegação por páginas. A busca e os filtros respeitam a paginação automaticamente.',
+ '1.5', now()),
+
+('melhoria',
+ 'Sub-sessões — hierarquia de dois níveis',
+ 'Sessões agora suportam sub-sessões. Crie estruturas como ERP → Módulo Fiscal ou eDocs → NF-e. A sidebar exibe a hierarquia com conectores visuais.',
+ '1.4', now()),
+
+('melhoria',
+ 'Histórico de edições com restauração',
+ 'Cada edição salva automaticamente uma versão anterior do registro. Acesse pelo botão Histórico e restaure qualquer versão com um clique.',
+ '1.3', now()),
+
+('novidade',
+ 'Busca no conteúdo dos registros',
+ 'A barra de busca pesquisa agora em título e conteúdo simultaneamente. Registros encontrados pelo conteúdo exibem o trecho relevante e o indicador "Encontrado no conteúdo".',
+ '1.3', now()),
+
+('novidade',
+ 'Categorias dinâmicas e sessões com sub-sessões',
+ 'Crie e personalize categorias e sessões diretamente pela interface, sem alterar código. Cada categoria tem nome e cor configuráveis.',
+ '1.2', now()),
+
+('melhoria',
+ 'Rodapé com copyright em todas as páginas',
+ 'Rodapé fixo adicionado em todas as telas com links rápidos de navegação e copyright.',
+ '1.6', now());

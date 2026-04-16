@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase, agruparSessoes, type CategoriaDB, type Sessao, type SessaoComFilhas, type ArquivoUpload } from '../lib/supabase'
 import Editor from './Editor'
 import UploadAnexos from './UploadAnexos'
+import FormCredencial, { criptografarCredencial, type CredencialForm } from './FormCredencial'
 
 interface RegistroFormData {
   id?: string
@@ -10,6 +11,8 @@ interface RegistroFormData {
   sessao_id: string
   categoria_id: string
   conteudo: string
+  privado?: boolean
+  temCredencial?: boolean
   anexosExistentes?: ArquivoUpload[]
 }
 
@@ -18,20 +21,28 @@ interface Props {
   modo: 'criar' | 'editar'
 }
 
+const CREDENCIAL_VAZIA: CredencialForm = {
+  tipo: 'rdp', host: '', porta: '3389',
+  usuario: '', senha: '', dominio: '', observacoes: '',
+}
+
 export default function FormRegistro({ inicial, modo }: Props) {
-  const navigate = useNavigate()
+  const navigate     = useNavigate()
   const [searchParams] = useSearchParams()
 
-  const [titulo,      setTitulo]      = useState(inicial?.titulo      ?? '')
-  const [sessaoId,    setSessaoId]    = useState(inicial?.sessao_id   ?? searchParams.get('sessao') ?? '')
-  const [categoriaId, setCategoriaId] = useState(inicial?.categoria_id ?? '')
-  const [conteudo,    setConteudo]    = useState(inicial?.conteudo    ?? '')
-  const [anexos,      setAnexos]      = useState<ArquivoUpload[]>(inicial?.anexosExistentes ?? [])
-  const [sessoes,     setSessoes]     = useState<Sessao[]>([])
-  const [arvore,      setArvore]      = useState<SessaoComFilhas[]>([])
-  const [categorias,  setCategorias]  = useState<CategoriaDB[]>([])
-  const [salvando,    setSalvando]    = useState(false)
-  const [erro,        setErro]        = useState('')
+  const [titulo,        setTitulo]        = useState(inicial?.titulo      ?? '')
+  const [sessaoId,      setSessaoId]      = useState(inicial?.sessao_id   ?? searchParams.get('sessao') ?? '')
+  const [categoriaId,   setCategoriaId]   = useState(inicial?.categoria_id ?? '')
+  const [conteudo,      setConteudo]      = useState(inicial?.conteudo    ?? '')
+  const [privado,       setPrivado]       = useState(inicial?.privado     ?? false)
+  const [comCredencial, setComCredencial] = useState(inicial?.temCredencial ?? false)
+  const [credencial,    setCredencial]    = useState<CredencialForm>(CREDENCIAL_VAZIA)
+  const [anexos,        setAnexos]        = useState<ArquivoUpload[]>(inicial?.anexosExistentes ?? [])
+  const [sessoes,       setSessoes]       = useState<Sessao[]>([])
+  const [arvore,        setArvore]        = useState<SessaoComFilhas[]>([])
+  const [categorias,    setCategorias]    = useState<CategoriaDB[]>([])
+  const [salvando,      setSalvando]      = useState(false)
+  const [erro,          setErro]          = useState('')
 
   useEffect(() => {
     supabase.from('sessoes').select('*').order('nome').then(({ data }) => {
@@ -48,57 +59,73 @@ export default function FormRegistro({ inicial, modo }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!titulo.trim())                               { setErro('O título é obrigatório.'); return }
-    if (!conteudo.trim() || conteudo === '<p></p>')   { setErro('O conteúdo não pode estar vazio.'); return }
-    if (!categoriaId)                                 { setErro('Selecione uma categoria.'); return }
+    if (!titulo.trim())                             { setErro('O título é obrigatório.'); return }
+    if (!conteudo.trim() || conteudo === '<p></p>') { setErro('O conteúdo não pode estar vazio.'); return }
+    if (!categoriaId)                               { setErro('Selecione uma categoria.'); return }
 
     setSalvando(true); setErro('')
 
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) throw new Error('Usuário não autenticado')
+
       let registroId = inicial?.id
 
       const payload = {
         titulo,
-        sessao_id:    sessaoId   || null,
+        sessao_id:    sessaoId    || null,
         categoria_id: categoriaId || null,
         conteudo,
+        privado,
       }
 
       if (modo === 'criar') {
-        const { data: { user } } = await supabase.auth.getUser()
         const { data, error } = await supabase
           .from('registros')
-          .insert({ ...payload, criado_por: user?.id })
+          .insert({ ...payload, criado_por: user.id })
           .select('id').single()
         if (error) throw error
         registroId = data.id
       } else {
-        // Busca estado atual para salvar no histórico antes de atualizar
         const { data: atual } = await supabase
-          .from('registros')
-          .select('titulo, conteudo, editado_por')
-          .eq('id', inicial!.id)
-          .single()
-
-        const { data: { user: currentUser } } = await supabase.auth.getUser()
+          .from('registros').select('titulo, conteudo')
+          .eq('id', inicial!.id).single()
 
         const { error } = await supabase
           .from('registros')
-          .update({ ...payload, atualizado_em: new Date().toISOString(), editado_por: currentUser?.id })
+          .update({ ...payload, atualizado_em: new Date().toISOString(), editado_por: user.id })
           .eq('id', inicial!.id)
         if (error) throw error
 
-        // Salva snapshot no histórico
         if (atual) {
           await supabase.from('registro_historico').insert({
             registro_id: inicial!.id,
             titulo:      atual.titulo,
             conteudo:    atual.conteudo,
-            editado_por: currentUser?.id,
+            editado_por: user.id,
           })
         }
       }
 
+      // Credenciais — criptografa antes de salvar
+      if (comCredencial && credencial.host) {
+        await supabase.from('credenciais').delete().eq('registro_id', registroId)
+        const cifrada = await criptografarCredencial(credencial, user.id)
+        await supabase.from('credenciais').insert({
+          registro_id:   registroId,
+          tipo:          cifrada.tipo,
+          host:          cifrada.host,
+          porta:         cifrada.porta,
+          usuario:       cifrada.usuario,
+          senha_cifrada: cifrada.senha_cifrada,
+          dominio:       cifrada.dominio,
+          observacoes:   cifrada.observacoes,
+        })
+      } else if (!comCredencial) {
+        await supabase.from('credenciais').delete().eq('registro_id', registroId)
+      }
+
+      // Anexos
       await supabase.from('anexos').delete().eq('registro_id', registroId)
       if (anexos.length > 0) {
         await supabase.from('anexos').insert(
@@ -114,7 +141,7 @@ export default function FormRegistro({ inicial, modo }: Props) {
     }
   }
 
-  const sessaoSelecionada   = sessoes.find(s => s.id === sessaoId)
+  const sessaoSelecionada    = sessoes.find(s => s.id === sessaoId)
   const categoriaSelecionada = categorias.find(c => c.id === categoriaId)
 
   return (
@@ -123,19 +150,43 @@ export default function FormRegistro({ inicial, modo }: Props) {
       <div>
         <input type="text" value={titulo} onChange={e => setTitulo(e.target.value)}
           placeholder="Título do registro..."
-          className="w-full text-2xl font-semibold bg-transparent border-none outline-none text-gray-900 placeholder:text-gray-300 py-1" />
+          className="w-full text-2xl font-semibold bg-transparent border-none outline-none
+                     text-gray-900 placeholder:text-gray-300 py-1" />
         <div className="h-px bg-gray-200 mt-2" />
+      </div>
+
+      {/* Toggle Privado */}
+      <div className={`flex items-start gap-3 rounded-xl border px-4 py-3.5 transition cursor-pointer
+        ${privado ? 'bg-amber-50 border-amber-300' : 'bg-gray-50 border-gray-200 hover:border-gray-300'}`}
+        onClick={() => setPrivado(v => !v)}>
+        <div className={`relative w-10 h-6 rounded-full flex-shrink-0 transition mt-0.5
+          ${privado ? 'bg-amber-500' : 'bg-gray-300'}`}>
+          <div className={`absolute top-1 w-4 h-4 bg-white rounded-full shadow transition-all
+            ${privado ? 'left-5' : 'left-1'}`} />
+        </div>
+        <div>
+          <p className={`text-sm font-semibold ${privado ? 'text-amber-800' : 'text-gray-700'}`}>
+            {privado ? '🔒 Registro privado' : '🌐 Registro público'}
+          </p>
+          <p className={`text-xs mt-0.5 ${privado ? 'text-amber-700' : 'text-gray-500'}`}>
+            {privado
+              ? 'Visível apenas para você. Ideal para credenciais e dados sensíveis.'
+              : 'Visível para toda a equipe autenticada.'}
+          </p>
+        </div>
       </div>
 
       {/* Sessão */}
       <div>
         <div className="flex items-center justify-between mb-2">
-          <label className="block text-sm font-medium text-gray-700">Sessão <span className="text-gray-400 font-normal">(opcional)</span></label>
+          <label className="block text-sm font-medium text-gray-700">
+            Sessão <span className="text-gray-400 font-normal">(opcional)</span>
+          </label>
           <a href="/sessoes" className="text-xs text-brand-600 hover:underline">+ Gerenciar sessões</a>
         </div>
         {sessoes.length === 0 ? (
           <p className="text-sm text-gray-400 bg-gray-50 rounded-xl px-4 py-3">
-            Nenhuma sessão criada.{' '}
+            Nenhuma sessão.{' '}
             <a href="/sessoes" className="text-brand-600 hover:underline font-medium">Criar agora</a>
           </p>
         ) : (
@@ -147,7 +198,6 @@ export default function FormRegistro({ inicial, modo }: Props) {
             </button>
             {arvore.map(sessao => (
               <div key={sessao.id} className="flex flex-col gap-1.5">
-                {/* Sessão raiz */}
                 <button type="button" onClick={() => setSessaoId(sessao.id)}
                   className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg text-sm font-medium transition border-2
                     ${sessaoId === sessao.id ? 'text-white border-transparent' : 'bg-white border-transparent hover:border-gray-200'}`}
@@ -158,7 +208,6 @@ export default function FormRegistro({ inicial, modo }: Props) {
                   </svg>
                   {sessao.nome}
                 </button>
-                {/* Sub-sessões */}
                 {sessao.filhas.map(filha => (
                   <button key={filha.id} type="button" onClick={() => setSessaoId(filha.id)}
                     className={`flex items-center gap-1 pl-5 pr-3 py-1 rounded-lg text-xs font-medium transition border-2
@@ -177,7 +226,9 @@ export default function FormRegistro({ inicial, modo }: Props) {
           </div>
         )}
         {sessaoSelecionada && (
-          <p className="text-xs text-gray-400 mt-2">Sessão: <strong style={{ color: sessaoSelecionada.cor }}>{sessaoSelecionada.nome}</strong></p>
+          <p className="text-xs text-gray-400 mt-2">
+            Sessão: <strong style={{ color: sessaoSelecionada.cor }}>{sessaoSelecionada.nome}</strong>
+          </p>
         )}
       </div>
 
@@ -205,7 +256,9 @@ export default function FormRegistro({ inicial, modo }: Props) {
         )}
         {categoriaSelecionada && (
           <p className="text-xs text-gray-400 mt-2">
-            Categoria: <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${categoriaSelecionada.cor}`}>{categoriaSelecionada.nome}</span>
+            Categoria: <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${categoriaSelecionada.cor}`}>
+              {categoriaSelecionada.nome}
+            </span>
           </p>
         )}
       </div>
@@ -214,6 +267,42 @@ export default function FormRegistro({ inicial, modo }: Props) {
       <div>
         <label className="block text-sm font-medium text-gray-700 mb-2">Conteúdo</label>
         <Editor conteudo={conteudo} onChange={setConteudo} />
+      </div>
+
+      {/* Bloco de Credenciais */}
+      <div className="border border-gray-200 rounded-2xl overflow-hidden">
+        <button type="button"
+          onClick={() => setComCredencial(v => !v)}
+          className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition">
+          <div className="flex items-center gap-3">
+            <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0
+              ${comCredencial ? 'bg-gray-800' : 'bg-gray-100'}`}>
+              <svg className={`w-4 h-4 ${comCredencial ? 'text-green-400' : 'text-gray-400'}`}
+                fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                  d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+              </svg>
+            </div>
+            <div className="text-left">
+              <p className="text-sm font-medium text-gray-800">Credencial de acesso</p>
+              <p className="text-xs text-gray-500">RDP, VPN, SSH, FTP — senha criptografada com AES-256</p>
+            </div>
+          </div>
+          <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition
+            ${comCredencial ? 'bg-gray-800 border-gray-800' : 'border-gray-300'}`}>
+            {comCredencial && (
+              <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+          </div>
+        </button>
+
+        {comCredencial && (
+          <div className="border-t border-gray-100 px-5 py-5 bg-gray-50/50">
+            <FormCredencial onChange={setCredencial} />
+          </div>
+        )}
       </div>
 
       {/* Anexos */}
@@ -227,17 +316,21 @@ export default function FormRegistro({ inicial, modo }: Props) {
       {erro && <p className="text-sm text-red-600 bg-red-50 px-4 py-3 rounded-xl">{erro}</p>}
 
       <div className="flex items-center justify-between pt-2 border-t border-gray-100">
-        <button type="button" onClick={() => navigate(-1)} className="text-sm text-gray-500 hover:text-gray-700 transition">
+        <button type="button" onClick={() => navigate(-1)}
+          className="text-sm text-gray-500 hover:text-gray-700 transition">
           Cancelar
         </button>
         <button type="submit" disabled={salvando}
-          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white font-medium px-5 py-2.5 rounded-xl text-sm transition disabled:opacity-60 disabled:cursor-not-allowed">
-          {salvando
-            ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Salvando...</>
-            : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>{modo === 'criar' ? 'Salvar registro' : 'Salvar alterações'}</>
-          }
+          className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white
+                     font-medium px-5 py-2.5 rounded-xl text-sm transition
+                     disabled:opacity-60 disabled:cursor-not-allowed">
+          {salvando ? (
+            <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Salvando...</>
+          ) : (
+            <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+            </svg>{modo === 'criar' ? 'Salvar registro' : 'Salvar alterações'}</>
+          )}
         </button>
       </div>
     </form>

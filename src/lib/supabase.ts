@@ -10,11 +10,10 @@ export interface Sessao {
   nome: string
   descricao: string
   cor: string
-  parent_id: string | null  // null = sessão raiz, preenchido = sub-sessão
+  parent_id: string | null
   criado_em: string
 }
 
-// Sessão com sub-sessões filhas já agrupadas (usado na sidebar e em listas)
 export interface SessaoComFilhas extends Sessao {
   filhas: Sessao[]
 }
@@ -32,11 +31,42 @@ export interface Registro {
   conteudo: string
   sessao_id: string | null
   categoria_id: string | null
+  privado: boolean
   criado_por: string
   editado_por: string | null
   criado_em: string
   atualizado_em: string
 }
+
+export interface Credencial {
+  id: string
+  registro_id: string
+  tipo: TipoCredencial
+  host: string
+  porta: string
+  usuario: string
+  senha_cifrada: string      // AES-256-GCM — nunca texto claro no banco
+  dominio: string
+  observacoes: string
+  criado_em: string
+}
+
+export type TipoCredencial =
+  | 'rdp'
+  | 'vpn'
+  | 'ssh'
+  | 'ftp'
+  | 'http'
+  | 'outro'
+
+export const TIPOS_CREDENCIAL: { value: TipoCredencial; label: string; porta: string }[] = [
+  { value: 'rdp',  label: 'RDP / Remote Desktop', porta: '3389' },
+  { value: 'vpn',  label: 'VPN',                  porta: ''     },
+  { value: 'ssh',  label: 'SSH',                  porta: '22'   },
+  { value: 'ftp',  label: 'FTP / SFTP',           porta: '21'   },
+  { value: 'http', label: 'HTTP / Painel Web',     porta: '443'  },
+  { value: 'outro',label: 'Outro',                porta: ''     },
+]
 
 export interface Anexo {
   id: string
@@ -65,10 +95,9 @@ export interface HistoricoRegistro {
   editor_email?: string
 }
 
-// Agrupa lista plana de sessões em árvore pai → filhas
 export function agruparSessoes(sessoes: Sessao[]): SessaoComFilhas[] {
-  const raizes  = sessoes.filter(s => !s.parent_id)
-  const filhas  = sessoes.filter(s =>  s.parent_id)
+  const raizes = sessoes.filter(s => !s.parent_id)
+  const filhas = sessoes.filter(s =>  s.parent_id)
   return raizes.map(r => ({
     ...r,
     filhas: filhas

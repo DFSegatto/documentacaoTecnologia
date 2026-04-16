@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import type { User } from '@supabase/supabase-js'
 import { supabase, CORES_SESSAO, agruparSessoes, type Sessao, type SessaoComFilhas } from '../lib/supabase'
 import Navbar from '../components/Navbar'
+import Footer from '../components/Footer'
 
 export default function Sessoes({ user }: { user: User | null }) {
   const [arvore,      setArvore]      = useState<SessaoComFilhas[]>([])
@@ -101,9 +102,9 @@ export default function Sessoes({ user }: { user: User | null }) {
   }
 
   return (
-    <div className="min-h-screen bg-[#f8f7f4]">
+    <div className="min-h-screen bg-[#f8f7f4] flex flex-col">
       <Navbar userEmail={user?.email} />
-      <main className="max-w-2xl mx-auto px-4 py-8">
+      <main className="max-w-2xl mx-auto px-4 py-8 flex-1">
 
         <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
           <Link to="/" className="hover:text-gray-600 transition">Registros</Link>
@@ -370,6 +371,4 @@ export default function Sessoes({ user }: { user: User | null }) {
           </p>
         )}
       </main>
-    </div>
-  )
-}
+    

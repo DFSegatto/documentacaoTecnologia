@@ -3,6 +3,7 @@ import { Link, useParams, useNavigate } from 'react-router-dom'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type HistoricoRegistro } from '../lib/supabase'
 import Navbar from '../components/Navbar'
+import Footer from '../components/Footer'
 
 export default function RestaurarVersao({ user }: { user: User | null }) {
   const { id, versaoId } = useParams<{ id: string; versaoId: string }>()
@@ -58,7 +59,7 @@ export default function RestaurarVersao({ user }: { user: User | null }) {
   }
 
   if (loading) return (
-    <div className="min-h-screen bg-[#f8f7f4]">
+    <div className="min-h-screen bg-[#f8f7f4] flex flex-col">
       <Navbar userEmail={user?.email} />
       <div className="flex items-center justify-center py-32">
         <div className="w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
@@ -67,9 +68,9 @@ export default function RestaurarVersao({ user }: { user: User | null }) {
   )
 
   return (
-    <div className="min-h-screen bg-[#f8f7f4]">
+    <div className="min-h-screen bg-[#f8f7f4] flex flex-col">
       <Navbar userEmail={user?.email} />
-      <main className="max-w-3xl mx-auto px-4 py-8">
+      <main className="max-w-3xl mx-auto px-4 py-8 flex-1">
         <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
           <Link to="/" className="hover:text-gray-600 transition">Registros</Link>
           <span>/</span>
@@ -131,6 +132,4 @@ export default function RestaurarVersao({ user }: { user: User | null }) {
           </button>
         </div>
       </main>
-    </div>
-  )
-}
+    

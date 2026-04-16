@@ -3,6 +3,7 @@ import { Link, useParams } from 'react-router-dom'
 import type { User } from '@supabase/supabase-js'
 import { supabase, type HistoricoRegistro } from '../lib/supabase'
 import Navbar from '../components/Navbar'
+import Footer from '../components/Footer'
 
 interface RegistroInfo { id: string; titulo: string }
 
@@ -67,7 +68,7 @@ export default function Historico({ user }: { user: User | null }) {
   }
 
   if (loading) return (
-    <div className="min-h-screen bg-[#f8f7f4]">
+    <div className="min-h-screen bg-[#f8f7f4] flex flex-col">
       <Navbar userEmail={user?.email} />
       <div className="flex items-center justify-center py-32">
         <div className="w-6 h-6 border-2 border-brand-600 border-t-transparent rounded-full animate-spin" />
@@ -76,9 +77,9 @@ export default function Historico({ user }: { user: User | null }) {
   )
 
   return (
-    <div className="min-h-screen bg-[#f8f7f4]">
+    <div className="min-h-screen bg-[#f8f7f4] flex flex-col">
       <Navbar userEmail={user?.email} />
-      <main className="max-w-3xl mx-auto px-4 py-8">
+      <main className="max-w-3xl mx-auto px-4 py-8 flex-1">
 
         <div className="flex items-center gap-2 text-sm text-gray-400 mb-6">
           <Link to="/" className="hover:text-gray-600 transition">Registros</Link>
@@ -216,6 +217,4 @@ export default function Historico({ user }: { user: User | null }) {
           </div>
         )}
       </main>
-    </div>
-  )
-}
+    

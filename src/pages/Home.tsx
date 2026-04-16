@@ -4,6 +4,8 @@ import type { User } from '@supabase/supabase-js'
 import { supabase, agruparSessoes, type CategoriaDB, type Sessao, type SessaoComFilhas } from '../lib/supabase'
 import Navbar from '../components/Navbar'
 import CategoriaBadge from '../components/CategoriaBadge'
+import Footer from '../components/Footer'
+import MuralAvisos from '../components/MuralAvisos'
 
 interface RegistroLista {
   id: string
@@ -147,6 +149,8 @@ export default function Home({ user }: { user: User | null }) {
     <div className="min-h-screen bg-[#f8f7f4]">
       <Navbar userEmail={user?.email} />
       <main className="max-w-6xl mx-auto px-4 py-8">
+
+        <MuralAvisos />
 
         {/* Header */}
         <div className="mb-6">
@@ -302,9 +306,17 @@ export default function Home({ user }: { user: User | null }) {
                           {r.categoria && <CategoriaBadge categoria={r.categoria} />}
                           <span className="text-xs text-gray-400">{formatarData(r.criado_em)}</span>
                         </div>
+                        <div className="flex items-center gap-1.5">
                         <h2 className="font-semibold text-gray-900 group-hover:text-brand-600 transition truncate">
                           {r.titulo}
                         </h2>
+                        {(r as any).privado && (
+                          <svg className="w-3.5 h-3.5 text-amber-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                              d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+                          </svg>
+                        )}
+                      </div>
                         {busca && !r.titulo.toLowerCase().includes(busca.toLowerCase()) &&
                           r.conteudo.toLowerCase().includes(busca.toLowerCase()) && (
                           <span className="inline-flex items-center gap-1 text-xs text-amber-600 mt-0.5">
@@ -409,6 +421,7 @@ export default function Home({ user }: { user: User | null }) {
           </div>
         </div>
       </main>
+      <Footer />
     </div>
   )
 }
