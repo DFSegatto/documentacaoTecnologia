@@ -220,4 +220,7 @@ export default function Categorias({ user }: { user: User | null }) {
           )}
         </div>
       </main>
-    
+      <Footer />
+    </div>
+  )
+}

@@ -371,4 +371,7 @@ export default function Sessoes({ user }: { user: User | null }) {
           </p>
         )}
       </main>
-    
+      <Footer />
+    </div>
+  )
+}

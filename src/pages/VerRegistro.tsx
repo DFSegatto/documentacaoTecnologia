@@ -270,4 +270,7 @@ export default function VerRegistro({ user }: { user: User | null }) {
           </Link>
         </div>
       </main>
-    
+      <Footer />
+    </div>
+  )
+}

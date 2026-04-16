@@ -362,4 +362,7 @@ export default function Configuracoes({ user }: { user: User | null }) {
         </div>
 
       </main>
-    
+      <Footer />
+    </div>
+  )
+}

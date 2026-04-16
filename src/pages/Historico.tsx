@@ -217,4 +217,7 @@ export default function Historico({ user }: { user: User | null }) {
           </div>
         )}
       </main>
-    
+      <Footer />
+    </div>
+  )
+}

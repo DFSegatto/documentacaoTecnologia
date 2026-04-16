@@ -132,4 +132,7 @@ export default function RestaurarVersao({ user }: { user: User | null }) {
           </button>
         </div>
       </main>
-    
+      <Footer />
+    </div>
+  )
+}
