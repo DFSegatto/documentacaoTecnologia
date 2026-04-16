@@ -1,17 +1,16 @@
 /**
  * Criptografia AES-256-GCM no lado do cliente
  *
- * A chave deriva do UID do usuário + uma senha mestra da aplicação.
+ * A chave deriva do UID do usuário + SALT fixo via PBKDF2.
  * O banco recebe apenas dados cifrados — nunca senhas em texto claro.
  *
- * Fluxo:
- *  Salvar:   texto → encrypt(chave) → base64 cifrado → banco
- *  Ler:      banco → base64 cifrado → decrypt(chave) → texto
+ * Formato armazenado: "<iv_base64>.<ciphertext_base64>"
+ * Separador "." é usado pois nunca aparece em base64 padrão (que usa A-Z a-z 0-9 + /)
  */
 
-const SALT = 'suporte-docs-credentials-v1'
+const SALT      = 'suporte-docs-credentials-v1'
+const SEPARATOR = '.'   // nunca ocorre em base64 padrão
 
-/** Deriva uma CryptoKey AES-256-GCM a partir do userId */
 async function derivarChave(userId: string): Promise<CryptoKey> {
   const enc    = new TextEncoder()
   const keyMat = await crypto.subtle.importKey(
@@ -35,12 +34,10 @@ async function derivarChave(userId: string): Promise<CryptoKey> {
   )
 }
 
-/** Converte ArrayBuffer para string base64 */
 function bufParaBase64(buf: ArrayBuffer): string {
   return btoa(String.fromCharCode(...new Uint8Array(buf)))
 }
 
-/** Converte string base64 para ArrayBuffer */
 function base64ParaBuf(b64: string): ArrayBuffer {
   const bytes = new Uint8Array([...atob(b64)].map(c => c.charCodeAt(0)))
   return bytes.buffer as ArrayBuffer
@@ -48,7 +45,7 @@ function base64ParaBuf(b64: string): ArrayBuffer {
 
 /**
  * Criptografa um texto usando AES-256-GCM.
- * Retorna uma string no formato "iv_base64:ciphertext_base64"
+ * Retorna "<iv_base64>.<ciphertext_base64>"
  */
 export async function criptografar(texto: string, userId: string): Promise<string> {
   if (!texto) return ''
@@ -62,17 +59,35 @@ export async function criptografar(texto: string, userId: string): Promise<strin
     enc.encode(texto).buffer as ArrayBuffer
   )
 
-  return `${bufParaBase64(iv.buffer as ArrayBuffer)}:${bufParaBase64(cifrado)}`
+  return `${bufParaBase64(iv.buffer as ArrayBuffer)}${SEPARATOR}${bufParaBase64(cifrado)}`
 }
 
 /**
- * Descriptografa uma string no formato "iv_base64:ciphertext_base64".
- * Retorna null se a chave estiver errada ou os dados corrompidos.
+ * Descriptografa uma string no formato "<iv_base64>.<ciphertext_base64>".
+ * Suporta também o formato legado com ":" como separador.
+ * Retorna null se falhar.
  */
 export async function descriptografar(cifrado: string, userId: string): Promise<string | null> {
   if (!cifrado) return ''
   try {
-    const [ivB64, dadosB64] = cifrado.split(':')
+    // Suporte ao separador legado ":" e ao novo "."
+    const sepIdx = cifrado.indexOf(SEPARATOR)
+    let ivB64: string
+    let dadosB64: string
+
+    if (sepIdx !== -1) {
+      // Novo formato: tudo antes do primeiro "." é o IV
+      ivB64   = cifrado.slice(0, sepIdx)
+      dadosB64 = cifrado.slice(sepIdx + 1)
+    } else {
+      // Formato legado com ":" — pega os primeiros 16 chars como IV
+      // IV de 12 bytes = 16 chars base64 exatos
+      const partes = cifrado.split(':')
+      if (partes.length < 2) return null
+      ivB64   = partes[0]
+      dadosB64 = partes.slice(1).join(':')
+    }
+
     if (!ivB64 || !dadosB64) return null
 
     const chave = await derivarChave(userId)
@@ -91,9 +106,8 @@ export async function descriptografar(cifrado: string, userId: string): Promise<
   }
 }
 
-/** Verifica se uma string é um valor criptografado (formato iv:dados) */
 export function estaCifrado(valor: string): boolean {
   if (!valor) return false
-  const partes = valor.split(':')
-  return partes.length === 2 && partes[0].length > 0 && partes[1].length > 0
+  // Aceita tanto "." (novo) quanto ":" (legado)
+  return valor.includes(SEPARATOR) || valor.includes(':')
 }

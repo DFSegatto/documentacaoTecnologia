@@ -240,9 +240,9 @@ export default function FormRegistro({ inicial, modo }: Props) {
             <a href="/sessoes" className="text-brand-600 hover:underline font-medium">Criar agora</a>
           </p>
         ) : (
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 items-start">
             <button type="button" onClick={() => setSessaoId('')}
-              className={`px-3.5 py-1.5 rounded-lg text-sm font-medium transition border
+              className={`self-start px-3.5 py-1.5 rounded-lg text-sm font-medium transition border
                 ${!sessaoId ? 'bg-gray-800 text-white border-gray-800' : 'bg-white text-gray-500 border-gray-200 hover:border-gray-300'}`}>
               Sem sessão
             </button>
