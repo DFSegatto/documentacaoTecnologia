@@ -59,9 +59,11 @@ export default function FormRegistro({ inicial, modo }: Props) {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!titulo.trim())                             { setErro('O título é obrigatório.'); return }
-    if (!conteudo.trim() || conteudo === '<p></p>') { setErro('O conteúdo não pode estar vazio.'); return }
-    if (!categoriaId)                               { setErro('Selecione uma categoria.'); return }
+    if (!titulo.trim()) { setErro('O título é obrigatório.'); return }
+    // Conteúdo só obrigatório se não for registro privado com credencial
+    const conteudoVazio = !conteudo.trim() || conteudo === '<p></p>'
+    if (conteudoVazio && !(privado && comCredencial)) { setErro('O conteúdo não pode estar vazio.'); return }
+    if (!categoriaId) { setErro('Selecione uma categoria.'); return }
 
     setSalvando(true); setErro('')
 
@@ -108,7 +110,7 @@ export default function FormRegistro({ inicial, modo }: Props) {
       }
 
       // Credenciais — criptografa antes de salvar
-      if (comCredencial && credencial.host) {
+      if (comCredencial) {
         await supabase.from('credenciais').delete().eq('registro_id', registroId)
         const cifrada = await criptografarCredencial(credencial, user.id)
         await supabase.from('credenciais').insert({

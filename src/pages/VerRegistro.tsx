@@ -213,15 +213,22 @@ export default function VerRegistro({ user }: { user: User | null }) {
 
           <div className="h-px bg-gray-100 mb-6" />
 
-          {/* Credencial */}
+          {/* Credencial — sempre exibida primeiro quando presente */}
           {credencial && user && (
             <div className="mb-6">
               <VisualizarCredencial credencial={credencial} userId={user.id} />
             </div>
           )}
 
-          {/* Conteúdo */}
-          <div className="tiptap-editor" dangerouslySetInnerHTML={{ __html: registro.conteudo }} />
+          {/* Conteúdo — exibido abaixo das credenciais, só se tiver texto */}
+          {registro.conteudo && registro.conteudo !== '<p></p>' && (
+            <>
+              {credencial && (
+                <div className="h-px bg-gray-100 mb-5" />
+              )}
+              <div className="tiptap-editor" dangerouslySetInnerHTML={{ __html: registro.conteudo }} />
+            </>
+          )}
 
           {/* Imagens */}
           {imagens.length > 0 && (
