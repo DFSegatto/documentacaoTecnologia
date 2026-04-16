@@ -27,7 +27,7 @@ export default function VerRegistro({ user }: { user: User | null }) {
 
   const [registro,    setRegistro]    = useState<RegistroCompleto | null>(null)
   const [anexos,      setAnexos]      = useState<Anexo[]>([])
-  const [credencial,  setCredencial]  = useState<Credencial | null>(null)
+  const [credenciais, setCredenciais] = useState<Credencial[]>([])
   const [loading,     setLoading]     = useState(true)
   const [semAcesso,   setSemAcesso]   = useState(false)
   const [confirmando, setConfirmando] = useState(false)
@@ -52,12 +52,15 @@ export default function VerRegistro({ user }: { user: User | null }) {
       const { data: anx } = await supabase
         .from('anexos').select('*').eq('registro_id', id).order('criado_em')
 
-      const { data: cred } = await supabase
-        .from('credenciais').select('*').eq('registro_id', id).single()
+      const { data: creds } = await supabase
+        .from('credenciais')
+        .select('*')
+        .eq('registro_id', id)
+        .order('ordem', { ascending: true })
 
       setRegistro(reg as unknown as RegistroCompleto)
       setAnexos((anx ?? []) as Anexo[])
-      setCredencial(cred as Credencial | null)
+      setCredenciais((creds ?? []) as Credencial[])
       setLoading(false)
     }
     carregar()
@@ -213,17 +216,17 @@ export default function VerRegistro({ user }: { user: User | null }) {
 
           <div className="h-px bg-gray-100 mb-6" />
 
-          {/* Credencial — sempre exibida primeiro quando presente */}
-          {credencial && user && (
+          {/* Credenciais — sempre exibidas primeiro quando presentes */}
+          {credenciais.length > 0 && user && (
             <div className="mb-6">
-              <VisualizarCredencial credencial={credencial} userId={user.id} />
+              <VisualizarCredencial credenciais={credenciais} userId={user.id} />
             </div>
           )}
 
           {/* Conteúdo — exibido abaixo das credenciais, só se tiver texto */}
           {registro.conteudo && registro.conteudo !== '<p></p>' && (
             <>
-              {credencial && (
+              {credenciais.length > 0 && (
                 <div className="h-px bg-gray-100 mb-5" />
               )}
               <div className="tiptap-editor" dangerouslySetInnerHTML={{ __html: registro.conteudo }} />

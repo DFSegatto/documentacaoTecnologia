@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { supabase, agruparSessoes, type CategoriaDB, type Sessao, type SessaoComFilhas, type ArquivoUpload } from '../lib/supabase'
 import Editor from './Editor'
 import UploadAnexos from './UploadAnexos'
-import FormCredencial, { criptografarCredencial, type CredencialForm } from './FormCredencial'
+import FormCredencial, { criptografarCredencial, type CredencialForm, CREDENCIAL_VAZIA } from './FormCredencial'
 
 interface RegistroFormData {
   id?: string
@@ -21,22 +21,17 @@ interface Props {
   modo: 'criar' | 'editar'
 }
 
-const CREDENCIAL_VAZIA: CredencialForm = {
-  tipo: 'rdp', host: '', porta: '3389',
-  usuario: '', senha: '', dominio: '', observacoes: '',
-}
-
 export default function FormRegistro({ inicial, modo }: Props) {
-  const navigate     = useNavigate()
+  const navigate       = useNavigate()
   const [searchParams] = useSearchParams()
 
-  const [titulo,        setTitulo]        = useState(inicial?.titulo      ?? '')
-  const [sessaoId,      setSessaoId]      = useState(inicial?.sessao_id   ?? searchParams.get('sessao') ?? '')
+  const [titulo,        setTitulo]        = useState(inicial?.titulo       ?? '')
+  const [sessaoId,      setSessaoId]      = useState(inicial?.sessao_id    ?? searchParams.get('sessao') ?? '')
   const [categoriaId,   setCategoriaId]   = useState(inicial?.categoria_id ?? '')
-  const [conteudo,      setConteudo]      = useState(inicial?.conteudo    ?? '')
-  const [privado,       setPrivado]       = useState(inicial?.privado     ?? false)
+  const [conteudo,      setConteudo]      = useState(inicial?.conteudo     ?? '')
+  const [privado,       setPrivado]       = useState(inicial?.privado      ?? false)
   const [comCredencial, setComCredencial] = useState(inicial?.temCredencial ?? false)
-  const [credencial,    setCredencial]    = useState<CredencialForm>(CREDENCIAL_VAZIA)
+  const [credenciais,   setCredenciais]   = useState<CredencialForm[]>([{ ...CREDENCIAL_VAZIA }])
   const [anexos,        setAnexos]        = useState<ArquivoUpload[]>(inicial?.anexosExistentes ?? [])
   const [sessoes,       setSessoes]       = useState<Sessao[]>([])
   const [arvore,        setArvore]        = useState<SessaoComFilhas[]>([])
@@ -57,12 +52,26 @@ export default function FormRegistro({ inicial, modo }: Props) {
     })
   }, [])
 
+  function adicionarCredencial() {
+    setCredenciais(prev => [...prev, { ...CREDENCIAL_VAZIA }])
+  }
+
+  function atualizarCredencial(indice: number, dados: CredencialForm) {
+    setCredenciais(prev => prev.map((c, i) => i === indice ? dados : c))
+  }
+
+  function removerCredencial(indice: number) {
+    setCredenciais(prev => prev.filter((_, i) => i !== indice))
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!titulo.trim()) { setErro('O título é obrigatório.'); return }
-    // Conteúdo só obrigatório se não for registro privado com credencial
+
     const conteudoVazio = !conteudo.trim() || conteudo === '<p></p>'
-    if (conteudoVazio && !(privado && comCredencial)) { setErro('O conteúdo não pode estar vazio.'); return }
+    if (conteudoVazio && !(privado && comCredencial)) {
+      setErro('O conteúdo não pode estar vazio.'); return
+    }
     if (!categoriaId) { setErro('Selecione uma categoria.'); return }
 
     setSalvando(true); setErro('')
@@ -77,7 +86,7 @@ export default function FormRegistro({ inicial, modo }: Props) {
         titulo,
         sessao_id:    sessaoId    || null,
         categoria_id: categoriaId || null,
-        conteudo,
+        conteudo:     conteudo === '<p></p>' ? '' : conteudo,
         privado,
       }
 
@@ -90,15 +99,12 @@ export default function FormRegistro({ inicial, modo }: Props) {
         registroId = data.id
       } else {
         const { data: atual } = await supabase
-          .from('registros').select('titulo, conteudo')
-          .eq('id', inicial!.id).single()
-
+          .from('registros').select('titulo, conteudo').eq('id', inicial!.id).single()
         const { error } = await supabase
           .from('registros')
           .update({ ...payload, atualizado_em: new Date().toISOString(), editado_por: user.id })
           .eq('id', inicial!.id)
         if (error) throw error
-
         if (atual) {
           await supabase.from('registro_historico').insert({
             registro_id: inicial!.id,
@@ -109,22 +115,29 @@ export default function FormRegistro({ inicial, modo }: Props) {
         }
       }
 
-      // Credenciais — criptografa antes de salvar
-      if (comCredencial) {
-        await supabase.from('credenciais').delete().eq('registro_id', registroId)
-        const cifrada = await criptografarCredencial(credencial, user.id)
-        await supabase.from('credenciais').insert({
-          registro_id:   registroId,
-          tipo:          cifrada.tipo,
-          host:          cifrada.host,
-          porta:         cifrada.porta,
-          usuario:       cifrada.usuario,
-          senha_cifrada: cifrada.senha_cifrada,
-          dominio:       cifrada.dominio,
-          observacoes:   cifrada.observacoes,
-        })
-      } else if (!comCredencial) {
-        await supabase.from('credenciais').delete().eq('registro_id', registroId)
+      // Salvar credenciais — apaga todas e reinserindo na ordem
+      await supabase.from('credenciais').delete().eq('registro_id', registroId)
+
+      if (comCredencial && credenciais.length > 0) {
+        const paraInserir = await Promise.all(
+          credenciais.map(async (cred, idx) => {
+            const cifrada = await criptografarCredencial(cred, user.id)
+            return {
+              registro_id:   registroId,
+              tipo:          cifrada.tipo,
+              label:         cifrada.label,
+              host:          cifrada.host,
+              porta:         cifrada.porta,
+              usuario:       cifrada.usuario,
+              senha_cifrada: cifrada.senha_cifrada,
+              dominio:       cifrada.dominio,
+              observacoes:   cifrada.observacoes,
+              ordem:         idx,
+            }
+          })
+        )
+        const { error: errCred } = await supabase.from('credenciais').insert(paraInserir)
+        if (errCred) throw errCred
       }
 
       // Anexos
@@ -136,7 +149,8 @@ export default function FormRegistro({ inicial, modo }: Props) {
       }
 
       navigate(`/registros/${registroId}`)
-    } catch {
+    } catch (err) {
+      console.error(err)
       setErro('Erro ao salvar. Tente novamente.')
     } finally {
       setSalvando(false)
@@ -265,16 +279,10 @@ export default function FormRegistro({ inicial, modo }: Props) {
         )}
       </div>
 
-      {/* Conteúdo */}
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-2">Conteúdo</label>
-        <Editor conteudo={conteudo} onChange={setConteudo} />
-      </div>
-
       {/* Bloco de Credenciais */}
       <div className="border border-gray-200 rounded-2xl overflow-hidden">
-        <button type="button"
-          onClick={() => setComCredencial(v => !v)}
+        {/* Header — toggle */}
+        <button type="button" onClick={() => setComCredencial(v => !v)}
           className="w-full flex items-center justify-between px-5 py-4 hover:bg-gray-50 transition">
           <div className="flex items-center gap-3">
             <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0
@@ -286,8 +294,8 @@ export default function FormRegistro({ inicial, modo }: Props) {
               </svg>
             </div>
             <div className="text-left">
-              <p className="text-sm font-medium text-gray-800">Credencial de acesso</p>
-              <p className="text-xs text-gray-500">RDP, VPN, SSH, FTP — senha criptografada com AES-256</p>
+              <p className="text-sm font-medium text-gray-800">Credenciais de acesso</p>
+              <p className="text-xs text-gray-500">RDP, VPN, SSH, FTP — senhas criptografadas com AES-256</p>
             </div>
           </div>
           <div className={`w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 transition
@@ -300,11 +308,45 @@ export default function FormRegistro({ inicial, modo }: Props) {
           </div>
         </button>
 
+        {/* Lista de credenciais */}
         {comCredencial && (
-          <div className="border-t border-gray-100 px-5 py-5 bg-gray-50/50">
-            <FormCredencial onChange={setCredencial} />
+          <div className="border-t border-gray-100 bg-gray-50/50">
+            <div className="p-4 space-y-3">
+              {credenciais.map((cred, idx) => (
+                <FormCredencial
+                  key={idx}
+                  credencial={cred}
+                  indice={idx}
+                  total={credenciais.length}
+                  onChange={dados => atualizarCredencial(idx, dados)}
+                  onRemover={() => removerCredencial(idx)}
+                />
+              ))}
+
+              {/* Botão adicionar */}
+              <button type="button" onClick={adicionarCredencial}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl border-2
+                           border-dashed border-gray-200 text-sm text-gray-500 hover:border-brand-300
+                           hover:text-brand-600 hover:bg-brand-50/30 transition">
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                </svg>
+                Adicionar outro acesso
+              </button>
+            </div>
           </div>
         )}
+      </div>
+
+      {/* Conteúdo */}
+      <div>
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Conteúdo
+          {privado && comCredencial && (
+            <span className="text-gray-400 font-normal ml-1">(opcional)</span>
+          )}
+        </label>
+        <Editor conteudo={conteudo} onChange={setConteudo} />
       </div>
 
       {/* Anexos */}
@@ -326,13 +368,12 @@ export default function FormRegistro({ inicial, modo }: Props) {
           className="flex items-center gap-2 bg-brand-600 hover:bg-brand-700 text-white
                      font-medium px-5 py-2.5 rounded-xl text-sm transition
                      disabled:opacity-60 disabled:cursor-not-allowed">
-          {salvando ? (
-            <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Salvando...</>
-          ) : (
-            <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>{modo === 'criar' ? 'Salvar registro' : 'Salvar alterações'}</>
-          )}
+          {salvando
+            ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />Salvando...</>
+            : <><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>{modo === 'criar' ? 'Salvar registro' : 'Salvar alterações'}</>
+          }
         </button>
       </div>
     </form>

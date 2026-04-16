@@ -417,3 +417,48 @@ insert into avisos (tipo, titulo, descricao, versao, publicado_em) values
  'Rodapé com copyright em todas as páginas',
  'Rodapé fixo adicionado em todas as telas com links rápidos de navegação e copyright.',
  '1.6', now());
+
+
+-- ============================================================
+-- ATUALIZAÇÃO: Múltiplas credenciais por registro
+-- Execute se já tinha a tabela credenciais criada antes
+-- ============================================================
+
+-- Remove a restrição unique que impedia múltiplas credenciais
+alter table credenciais drop constraint if exists credenciais_registro_id_key;
+
+-- Adiciona campos novos
+alter table credenciais add column if not exists label  text not null default '';
+alter table credenciais add column if not exists ordem  int  not null default 0;
+
+-- Índice de ordenação
+create index if not exists credenciais_ordem_idx on credenciais(registro_id, ordem);
+
+-- Se a tabela ainda não existia, crie do zero com a estrutura completa:
+-- (ignore se já existia e rodou os comandos acima)
+create table if not exists credenciais (
+  id            uuid default gen_random_uuid() primary key,
+  registro_id   uuid references registros(id) on delete cascade not null,
+  tipo          text not null default 'rdp'
+                  check (tipo in ('rdp','vpn','ssh','ftp','http','outro')),
+  label         text not null default '',
+  host          text not null default '',
+  porta         text not null default '',
+  usuario       text not null default '',
+  senha_cifrada text not null default '',
+  dominio       text not null default '',
+  observacoes   text not null default '',
+  ordem         int  not null default 0,
+  criado_em     timestamptz default now()
+);
+
+alter table credenciais enable row level security;
+
+create policy "dono le credenciais" on credenciais for select to authenticated
+  using (exists (select 1 from registros r where r.id = credenciais.registro_id and r.criado_por = auth.uid()));
+
+create policy "dono cria credenciais" on credenciais for insert to authenticated
+  with check (exists (select 1 from registros r where r.id = credenciais.registro_id and r.criado_por = auth.uid()));
+
+create policy "dono exclui credenciais" on credenciais for delete to authenticated
+  using (exists (select 1 from registros r where r.id = credenciais.registro_id and r.criado_por = auth.uid()));

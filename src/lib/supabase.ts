@@ -42,12 +42,14 @@ export interface Credencial {
   id: string
   registro_id: string
   tipo: TipoCredencial
+  label: string          // nome identificador do acesso ex: "Servidor Principal"
   host: string
   porta: string
   usuario: string
-  senha_cifrada: string      // AES-256-GCM — nunca texto claro no banco
+  senha_cifrada: string
   dominio: string
   observacoes: string
+  ordem: number
   criado_em: string
 }
 
@@ -60,12 +62,12 @@ export type TipoCredencial =
   | 'outro'
 
 export const TIPOS_CREDENCIAL: { value: TipoCredencial; label: string; porta: string }[] = [
-  { value: 'rdp',  label: 'RDP / Remote Desktop', porta: '3389' },
-  { value: 'vpn',  label: 'VPN',                  porta: ''     },
-  { value: 'ssh',  label: 'SSH',                  porta: '22'   },
-  { value: 'ftp',  label: 'FTP / SFTP',           porta: '21'   },
-  { value: 'http', label: 'HTTP / Painel Web',     porta: '443'  },
-  { value: 'outro',label: 'Outro',                porta: ''     },
+  { value: 'rdp',   label: 'RDP / Remote Desktop', porta: '3389' },
+  { value: 'vpn',   label: 'VPN',                  porta: ''     },
+  { value: 'ssh',   label: 'SSH',                  porta: '22'   },
+  { value: 'ftp',   label: 'FTP / SFTP',           porta: '21'   },
+  { value: 'http',  label: 'HTTP / Painel Web',     porta: '443'  },
+  { value: 'outro', label: 'Outro',                 porta: ''     },
 ]
 
 export interface Anexo {
