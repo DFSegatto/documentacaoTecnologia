@@ -389,7 +389,20 @@ insert into avisos (tipo, titulo, descricao, versao, publicado_em) values
  ('novidade',
  'Registros privados com credenciais criptografadas',
  'Crie registros privados visíveis apenas para você. Salve acessos RDP, VPN, SSH e FTP com senhas protegidas por AES-256-GCM — criptografadas no navegador antes de chegar ao banco.',
- '1.6', now()))
+ '1.6', now()),
+ ('novidade',
+ 'Mural de novidades na página inicial',
+ 'Veja comunicados de novidades, melhorias e correções ao abrir a documentação. Você pode dispensar avisos um a um ou marcar todos como lidos.',
+ '1.9', now()),
+ ('melhoria',
+ 'Alerta por e-mail quando não há atualizações',
+ 'Em Configurações, cadastre um e-mail para lembretes se o sistema ficar vários dias sem novas edições nos registros. A página mostra também o histórico das últimas verificações.',
+ '1.9', now());
+
+-- Bancos já existentes: rode no SQL Editor (uma vez) o mesmo conteúdo acima, por exemplo:
+-- insert into avisos (tipo, titulo, descricao, versao, publicado_em) values
+-- ('novidade','Mural de novidades na página inicial','Veja comunicados de novidades, melhorias e correções ao abrir a documentação. Você pode dispensar avisos um a um ou marcar todos como lidos.','1.9', now()),
+-- ('melhoria','Alerta por e-mail quando não há atualizações','Em Configurações, cadastre um e-mail para lembretes se o sistema ficar vários dias sem novas edições nos registros. A página mostra também o histórico das últimas verificações.','1.9', now());
 
 -- ============================================================
 -- ATUALIZAÇÃO: Múltiplas credenciais por registro
