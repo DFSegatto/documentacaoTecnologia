@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import { CHANGELOG } from "../lib/changelog";
+import { useEffect, useState } from "react";
 import { supabase } from "../lib/supabase";
 
+/** Avisos vêm da tabela `avisos` no Supabase (SQL Editor ou Table Editor). */
 type TipoAviso = "novidade" | "melhoria" | "correcao" | "aviso";
 
 interface Aviso {
@@ -48,40 +48,11 @@ const CONFIGS: Record<
   },
 };
 
-const LIMITE_MURAL = 15;
-
-function chaveTituloVersao(a: { titulo: string; versao: string | null }) {
-  return `${(a.versao ?? "").trim()}|${a.titulo.trim().toLowerCase()}`;
-}
-
-function changelogParaAvisos(): Aviso[] {
-  return CHANGELOG.map((c, i) => ({
-    id: `changelog:${i}`,
-    tipo: c.tipo,
-    titulo: c.titulo,
-    descricao: c.descricao,
-    versao: c.versao,
-    publicado_em:
-      c.publicadoEm ??
-      new Date(Date.UTC(2024, 0, 1 + i)).toISOString(),
-    ativo: true,
-  }));
-}
+const LIMITE_MURAL = 5;
 
 export default function MuralAvisos() {
-  const [avisosDb, setAvisosDb] = useState<Aviso[]>([]);
-  const avisosChangelog = useMemo(() => changelogParaAvisos(), []);
-  const avisos = useMemo(() => {
-    const chavesCh = new Set(avisosChangelog.map(chaveTituloVersao));
-    const doBanco = avisosDb.filter((a) => !chavesCh.has(chaveTituloVersao(a)));
-    return [...avisosChangelog, ...doBanco]
-      .sort(
-        (a, b) =>
-          new Date(b.publicado_em).getTime() -
-          new Date(a.publicado_em).getTime(),
-      )
-      .slice(0, LIMITE_MURAL);
-  }, [avisosChangelog, avisosDb]);
+  const [avisos, setAvisos] = useState<Aviso[]>([]);
+  const [loading, setLoading] = useState(true);
   const [aberto, setAberto] = useState(true);
   const [dispensados, setDispensados] = useState<Set<string>>(() => {
     try {
@@ -100,7 +71,8 @@ export default function MuralAvisos() {
       .order("publicado_em", { ascending: false })
       .limit(LIMITE_MURAL)
       .then(({ data }) => {
-        setAvisosDb((data ?? []) as Aviso[]);
+        setAvisos((data ?? []) as Aviso[]);
+        setLoading(false);
       });
   }, []);
 
@@ -124,7 +96,7 @@ export default function MuralAvisos() {
 
   const visiveis = avisos.filter((a) => !dispensados.has(a.id));
 
-  if (visiveis.length === 0) return null;
+  if (loading || visiveis.length === 0) return null;
 
   function formatarData(iso: string) {
     return new Date(iso).toLocaleDateString("pt-BR", {
