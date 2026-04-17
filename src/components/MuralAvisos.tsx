@@ -49,6 +49,49 @@ const CONFIGS: Record<
 };
 
 const LIMITE_MURAL = 5;
+/** Quantos registros buscar antes de ordenar por versão e cortar em LIMITE_MURAL */
+const BUSCA_ANTES_ORDENAR = 40;
+
+function partesVersao(v: string | null): number[] {
+  if (!v?.trim()) return [];
+  return v.trim().split(".").map((p) => {
+    const n = parseInt(p, 10);
+    return Number.isFinite(n) ? n : 0;
+  });
+}
+
+/** Compara versões tipo 1.9 / 1.10 (numérico por segmento). */
+function cmpVersaoAsc(va: string | null, vb: string | null): number {
+  const a = partesVersao(va);
+  const b = partesVersao(vb);
+  const len = Math.max(a.length, b.length);
+  for (let i = 0; i < len; i++) {
+    const da = a[i] ?? 0;
+    const db = b[i] ?? 0;
+    if (da !== db) return da - db;
+  }
+  return 0;
+}
+
+/** Maior versão primeiro; sem versão por último; empate: mais recente em publicado_em. */
+function ordenarAvisosPorVersao(lista: Aviso[]): Aviso[] {
+  return [...lista].sort((a, b) => {
+    const semA = !a.versao?.trim();
+    const semB = !b.versao?.trim();
+    if (semA && semB) {
+      return (
+        new Date(b.publicado_em).getTime() - new Date(a.publicado_em).getTime()
+      );
+    }
+    if (semA) return 1;
+    if (semB) return -1;
+    const c = cmpVersaoAsc(b.versao, a.versao);
+    if (c !== 0) return c;
+    return (
+      new Date(b.publicado_em).getTime() - new Date(a.publicado_em).getTime()
+    );
+  });
+}
 
 export default function MuralAvisos() {
   const [avisos, setAvisos] = useState<Aviso[]>([]);
@@ -69,9 +112,10 @@ export default function MuralAvisos() {
       .select("*")
       .eq("ativo", true)
       .order("publicado_em", { ascending: false })
-      .limit(LIMITE_MURAL)
+      .limit(BUSCA_ANTES_ORDENAR)
       .then(({ data }) => {
-        setAvisos((data ?? []) as Aviso[]);
+        const rows = (data ?? []) as Aviso[];
+        setAvisos(ordenarAvisosPorVersao(rows).slice(0, LIMITE_MURAL));
         setLoading(false);
       });
   }, []);
