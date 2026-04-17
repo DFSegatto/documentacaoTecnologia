@@ -379,45 +379,17 @@ create policy "service gerencia avisos" on avisos for all using (auth.role() = '
 insert into avisos (tipo, titulo, descricao, versao, publicado_em) values
 
 ('novidade',
+ 'Modo claro/escuro para o sistema',
+ 'O sistema agora possui um modo claro/escuro para melhorar a usabilidade. Você pode alternar entre os modos clicando no botão de alternância no canto superior direito, ao lado do seu nome de usuário na barra de navegação.',
+ '1.7', now()),
+ ('novidade',
+ 'Notas de versão Sênior',
+ 'Agora você pode ver as notas de versão Sênior no sistema. Clique no botão "Notas de versão Sênior" na barra de navegação para ver as notas de versão Sênior.',
+ '1.7', now()),
+ ('novidade',
  'Registros privados com credenciais criptografadas',
  'Crie registros privados visíveis apenas para você. Salve acessos RDP, VPN, SSH e FTP com senhas protegidas por AES-256-GCM — criptografadas no navegador antes de chegar ao banco.',
- '1.6', now()),
-
-('novidade',
- 'Mural de novidades do sistema',
- 'Este painel exibe as atualizações mais recentes do sistema. Você pode dispensar cada aviso individualmente ou todos de uma vez. Os avisos não voltam após dispensados.',
- '1.6', now()),
-
-('melhoria',
- 'Paginação na listagem de registros',
- 'A lista de registros agora carrega apenas 10 itens por vez, com navegação por páginas. A busca e os filtros respeitam a paginação automaticamente.',
- '1.5', now()),
-
-('melhoria',
- 'Sub-sessões — hierarquia de dois níveis',
- 'Sessões agora suportam sub-sessões. Crie estruturas como ERP → Módulo Fiscal ou eDocs → NF-e. A sidebar exibe a hierarquia com conectores visuais.',
- '1.4', now()),
-
-('melhoria',
- 'Histórico de edições com restauração',
- 'Cada edição salva automaticamente uma versão anterior do registro. Acesse pelo botão Histórico e restaure qualquer versão com um clique.',
- '1.3', now()),
-
-('novidade',
- 'Busca no conteúdo dos registros',
- 'A barra de busca pesquisa agora em título e conteúdo simultaneamente. Registros encontrados pelo conteúdo exibem o trecho relevante e o indicador "Encontrado no conteúdo".',
- '1.3', now()),
-
-('novidade',
- 'Categorias dinâmicas e sessões com sub-sessões',
- 'Crie e personalize categorias e sessões diretamente pela interface, sem alterar código. Cada categoria tem nome e cor configuráveis.',
- '1.2', now()),
-
-('melhoria',
- 'Rodapé com copyright em todas as páginas',
- 'Rodapé fixo adicionado em todas as telas com links rápidos de navegação e copyright.',
- '1.6', now());
-
+ '1.6', now()))
 
 -- ============================================================
 -- ATUALIZAÇÃO: Múltiplas credenciais por registro
