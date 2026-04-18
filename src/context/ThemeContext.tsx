@@ -11,6 +11,13 @@ export const THEME_STORAGE_KEY = 'bc-theme'
 
 export type Theme = 'light' | 'dark'
 
+function getSystemTheme(): Theme {
+  if (typeof window === 'undefined') return 'light'
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+    ? 'dark'
+    : 'light'
+}
+
 function readStoredTheme(): Theme | null {
   try {
     const v = localStorage.getItem(THEME_STORAGE_KEY)
@@ -47,12 +54,23 @@ const ThemeContext = createContext<ThemeContextValue | null>(null)
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setThemeState] = useState<Theme>(() => {
     if (typeof window === 'undefined') return 'light'
-    return readStoredTheme() ?? 'light'
+    return readStoredTheme() ?? getSystemTheme()
   })
 
   useEffect(() => {
     applyDomTheme(theme)
   }, [theme])
+
+  useEffect(() => {
+    const mq = window.matchMedia('(prefers-color-scheme: dark)')
+    const onChange = () => {
+      if (readStoredTheme() === null) {
+        setThemeState(mq.matches ? 'dark' : 'light')
+      }
+    }
+    mq.addEventListener('change', onChange)
+    return () => mq.removeEventListener('change', onChange)
+  }, [])
 
   const setTheme = useCallback((t: Theme) => {
     setThemeState(t)

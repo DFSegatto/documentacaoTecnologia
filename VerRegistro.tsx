@@ -116,9 +116,10 @@ export default function VerRegistro({ user }: { user: User | null }) {
 
   const imagens = anexos.filter(a => a.tipo === 'imagem')
   const pdfs    = anexos.filter(a => a.tipo === 'pdf')
-  const ehDono = user?.id === registro.criado_por
-  /** Conteúdo público: qualquer autenticado pode editar; privado: só o criador. */
-  const podeEditar = !registro.privado || ehDono
+  const ehDono      = user?.id === registro.criado_por
+  // Público: qualquer autenticado pode editar/excluir
+  // Privado: só o dono pode editar/excluir
+  const podeEditar  = !registro.privado || ehDono
 
   return (
     <div className="min-h-screen bg-[#f8f7f4] dark:bg-gray-950 flex flex-col">
@@ -159,7 +160,7 @@ export default function VerRegistro({ user }: { user: User | null }) {
                 {registro.categoria && <CategoriaBadge categoria={registro.categoria} />}
               </div>
 
-              {/* Ações: público → histórico/editar/excluir para todos; privado → só o criador. */}
+              {/* Ações: público = qualquer um; privado = só o dono */}
               {podeEditar && (
                 <div className="flex items-center gap-2">
                   <Link to={`/registros/${id}/historico`}

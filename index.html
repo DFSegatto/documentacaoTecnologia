@@ -6,7 +6,9 @@
         try {
           var k = 'bc-theme'
           var s = localStorage.getItem(k)
-          var dark = s === 'dark'
+          var dark =
+            s === 'dark' ||
+            (!s && window.matchMedia('(prefers-color-scheme: dark)').matches)
           if (dark) document.documentElement.classList.add('dark')
         } catch (e) {}
       })()
