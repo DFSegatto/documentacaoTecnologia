@@ -1,3 +1,4 @@
+import { useEffect, useRef } from 'react'
 import { useEditor, EditorContent, type Editor as TiptapEditor } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Image from '@tiptap/extension-image'
@@ -94,6 +95,17 @@ export default function Editor({ conteudo, onChange }: EditorProps) {
     editorProps: { attributes: { class: 'tiptap-editor' } },
     onUpdate: ({ editor }) => onChange(editor.getHTML()),
   })
+
+  // Sincroniza conteúdo externo (ex: restaurar rascunho) sem perder cursor se já for igual
+  const prevConteudo = useRef(conteudo)
+  useEffect(() => {
+    if (!editor) return
+    if (conteudo === prevConteudo.current) return
+    prevConteudo.current = conteudo
+    if (editor.getHTML() !== conteudo) {
+      editor.commands.setContent(conteudo ?? '', false)
+    }
+  }, [conteudo, editor])
 
   if (!editor) return null
 
