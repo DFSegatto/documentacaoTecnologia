@@ -13,6 +13,10 @@ import Sessoes         from './pages/Sessoes'
 import Historico       from './pages/Historico'
 import RestaurarVersao from './pages/RestaurarVersao'
 import Configuracoes   from './pages/Configuracoes'
+import Chamados        from './pages/Chamados'
+import VerChamado      from './pages/VerChamado'
+import GerenciarPerfis from './pages/GerenciarPerfis'
+import ReleaseNotes     from './pages/ReleaseNotes'
 
 type AuthState = 'loading' | 'authenticated' | 'unauthenticated'
 
@@ -66,6 +70,10 @@ export default function App() {
       <Route path="/categorias"                      element={<P><Categorias user={user} /></P>} />
       <Route path="/sessoes"                         element={<P><Sessoes user={user} /></P>} />
       <Route path="/configuracoes"                   element={<P><Configuracoes user={user} /></P>} />
+      <Route path="/chamados"                        element={<P><Chamados user={user} /></P>} />
+      <Route path="/chamados/:id"                    element={<P><VerChamado user={user} /></P>} />
+      <Route path="/perfis"                          element={<P><GerenciarPerfis user={user} /></P>} />
+      <Route path="/notas-de-versao"                  element={<P><ReleaseNotes user={user} /></P>} />
       <Route path="*"                                element={<Navigate to="/" replace />} />
     </Routes>
   )
