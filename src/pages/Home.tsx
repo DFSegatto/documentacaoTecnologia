@@ -1,4 +1,4 @@
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import type { User } from '@supabase/supabase-js'
 import { supabase, agruparSessoes, type CategoriaDB, type Sessao, type SessaoComFilhas } from '../lib/supabase'
@@ -34,6 +34,23 @@ export default function Home({ user }: { user: User | null }) {
   const sessaoFiltro    = searchParams.get('sessao')    ?? ''
   const categoriaFiltro = searchParams.get('categoria') ?? ''
   const busca           = searchParams.get('q')         ?? ''
+
+  // Estado local do input — não dispara fetch a cada tecla
+  const [inputBusca, setInputBusca] = useState(busca)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  // Sincroniza input local se a URL mudar externamente (ex: voltar no histórico)
+  useEffect(() => {
+    setInputBusca(prev => prev !== busca ? busca : prev)
+  }, [busca])
+
+  function handleBuscaChange(valor: string) {
+    setInputBusca(valor)
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      setParam('q', valor)
+    }, 400)
+  }
 
   // Carrega sessões e categorias uma única vez (em paralelo)
   useEffect(() => {
@@ -291,7 +308,7 @@ export default function Home({ user }: { user: User | null }) {
 
             {/* Busca */}
             <div className="mb-4">
-              <input type="search" value={busca} onChange={e => setParam('q', e.target.value)}
+              <input type="search" value={inputBusca} onChange={e => handleBuscaChange(e.target.value)}
                 placeholder="Busca por título ou conteúdo..."
                 className="w-full px-4 py-2.5 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 text-sm
                            focus:outline-none focus:ring-2 focus:ring-brand-600 focus:border-transparent
